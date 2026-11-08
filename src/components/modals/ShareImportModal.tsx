@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { CrosshairConfig } from '../../types/crosshair';
 import { exportValorantCode, parseValorantCode } from '../../lib/valorantParser';
 import { exportCS2Commands, parseCS2Commands } from '../../lib/cs2Parser';
-import { X, Copy, Check, Upload, Terminal } from 'lucide-react';
+import { X, Copy, Check } from 'lucide-react';
 
 interface ShareImportModalProps {
   isOpen: boolean;
@@ -28,7 +28,6 @@ export const ShareImportModal: React.FC<ShareImportModalProps> = ({
 
   const valorantCode = exportValorantCode(config);
   const cs2Commands = exportCS2Commands(config);
-  const jsonCode = JSON.stringify(config, null, 2);
 
   const handleCopy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -151,6 +150,12 @@ export const ShareImportModal: React.FC<ShareImportModalProps> = ({
             <div className="space-y-3">
               <p className="text-zinc-400 text-xs">
                 Paste any official Valorant crosshair code (0;P;...), CS2 console snippet (cl_crosshair...), or JSON to load it:
+              </p>
+              <p className="text-zinc-500 text-[10.5px] leading-relaxed">
+                This applies one crosshair to what you are currently editing. To bring in a crshhx
+                file with many crosshairs, folders, settings or weapon-slot profiles, use
+                Preset Manager → Import file — that route previews the whole file before changing
+                anything.
               </p>
               <textarea
                 rows={4}

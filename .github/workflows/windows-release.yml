@@ -1,0 +1,130 @@
+# Windows release build.
+#
+# This workflow exists because the development sandbox cannot produce Windows
+# artifacts: it can reach github.com but not the release-asset CDN that serves
+# the NSIS compiler and the code-sign toolchain electron-builder downloads.
+# Packaging on a Windows runner removes that problem entirely — the toolchain
+# downloads natively, and rcedit can stamp the executable's icon and version
+# metadata, which a Linux build cannot do at all.
+#
+# A pull request gets the quality gate: tests, both typechecks and the production
+# build. The Windows job is deliberately not part of that — it costs about ten
+# minutes of runner time to produce executables nobody installs from a PR.
+#
+# The executables are produced by a manual run, or by pushing a tag like v1.0.0.
+# The workflow uploads exactly two artifacts: the NSIS installer and the portable
+# executable, each with its size and SHA-256 printed in the log so a release page
+# can quote measured numbers instead of estimates.
+#
+# Note that GitHub only registers workflows that exist on the default branch, so
+# neither the manual run button nor the tag trigger works until this file is on
+# `main`. A pull request from a branch does run the copy in that branch, which is
+# what makes the quality gate below useful before merging.
+#
+# Nothing here signs the binaries. Code signing is a separate decision.
+
+name: windows-release
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+  push:
+    tags:
+      - 'v*'
+
+# The minimum this workflow needs: `actions/checkout` reads the repository, and
+# `actions/upload-artifact` writes into its own run, which the run token already
+# allows. Nothing here pushes, releases or publishes, so nothing gets write access.
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  quality:
+    name: Tests, typechecks, production build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Tests, typechecks and the Vite build never launch Electron, so the
+      # ~100 MB binary download is skipped here.
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+      - name: Test suite
+        run: npm test
+
+      # Both typechecks are expected to be clean with no filtering. If a future
+      # change reintroduces unused imports, this fails rather than hiding them.
+      - name: Renderer typecheck
+        run: npx tsc -p tsconfig.json --noEmit
+
+      - name: Main-process typecheck
+        run: npm run typecheck:main
+
+      - name: Production build
+        run: npm run build
+
+  package:
+    name: Windows installer + portable
+    runs-on: windows-latest
+    needs: quality
+    # A pull request gets the quality gate and stops there. The executables are
+    # built for a tag or a manual run, where someone is going to download them.
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # On Windows the Electron binary is required: electron-builder packs it
+      # into both artifacts.
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Production build
+        run: npm run build
+
+      - name: Build both Windows targets
+        run: npx electron-builder --win --publish never
+
+      - name: Report measured sizes and hashes
+        shell: pwsh
+        run: |
+          # This output is meant to be quoted as measured numbers, so it must not
+          # print a stray PowerShell error: a missing folder is reported as a
+          # missing folder rather than as a red herring above the real figures.
+          $unpacked = Join-Path release 'win-unpacked'
+          if (Test-Path $unpacked) {
+            $installed = (Get-ChildItem -Recurse $unpacked | Measure-Object -Property Length -Sum).Sum
+            "Installed (unpacked) size: {0:N0} bytes" -f $installed
+          } else {
+            "No win-unpacked directory was produced; reporting the executables only."
+          }
+          Get-ChildItem release -Filter *.exe | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash
+            "{0}: {1:N0} bytes  sha256={2}" -f $_.Name, $_.Length, $hash
+          }
+
+      - name: Upload installer and portable executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: crshhx-windows-${{ github.ref_name }}
+          path: |
+            release/*.exe
+          if-no-files-found: error

@@ -1,0 +1,7 @@
+# crshhx website — static marketing and documentation site.
+# Everything here is public content, so nothing is disallowed.
+User-agent: *
+Allow: /
+
+# A Sitemap: line is added by the build once SITE_URL is set at deploy time
+# (scripts/prerender.mjs writes sitemap.xml only when a public origin exists).

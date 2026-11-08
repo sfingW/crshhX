@@ -22,6 +22,22 @@ module.exports = {
           cardHover: '#22232b',
           border: '#262832',
           borderLight: '#323542',
+        },
+        /**
+         * Panel ramp used by the editor, designer and import surfaces.
+         *
+         * These classes were already used in ~100 places across ReticleControls,
+         * LivePreview, CodeImportExport and TopNav but were never defined, so
+         * every "card" rendered with no background and no border. Defining the
+         * ramp once — as a deliberate light-to-dark progression over the same
+         * surface scale — fixes all of them without touching any JSX.
+         */
+        panel: {
+          elevated: '#22232b', // outer container
+          base: '#1b1c22',     // section cards
+          card: '#1b1c22',
+          subtle: '#16171b',   // input wells
+          border: '#262832',
         }
       },
       fontFamily: {

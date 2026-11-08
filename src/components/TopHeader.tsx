@@ -1,7 +1,5 @@
 import React from 'react';
 import {
-  Eye,
-  EyeOff,
   Share2,
   Download,
   Minus,
@@ -11,6 +9,8 @@ import {
   Palette,
 } from 'lucide-react';
 import { THEME_ACCENTS, ThemeAccent } from '../lib/theme';
+import { ActiveSlotIndicator } from './ActiveSlotIndicator';
+import type { WeaponSlotStatus } from '../lib/weaponSlots/types';
 
 interface TopHeaderProps {
   overlayVisible: boolean;
@@ -23,6 +23,9 @@ interface TopHeaderProps {
   onSelectSubTab?: (tab: string) => void;
   searchQuery?: string;
   onSearchChange?: (q: string) => void;
+  /** Weapon Slot Crosshairs status, shown in the bar. */
+  weaponSlotStatus?: WeaponSlotStatus | null;
+  weaponSlotPulse?: boolean;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
@@ -36,6 +39,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onSelectSubTab,
   searchQuery = '',
   onSearchChange,
+  weaponSlotStatus = null,
+  weaponSlotPulse = false,
 }) => {
   return (
     <header className="h-12 bg-surface-sidebar border-b border-surface-border flex items-center justify-between px-6 select-none shrink-0 text-xs">
@@ -99,6 +104,9 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
       {/* Right Controls */}
       <div className="flex items-center gap-4">
+        {/* Weapon Slot Crosshairs — active slot indicator */}
+        <ActiveSlotIndicator status={weaponSlotStatus} pulse={weaponSlotPulse} />
+
         {/* Theme Accent Palette Selector */}
         <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-card border border-surface-border">
           <Palette className="w-3 h-3 text-zinc-400 mr-1" />

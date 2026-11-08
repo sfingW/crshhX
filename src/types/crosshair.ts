@@ -4,11 +4,26 @@ export type StretchedResolutionMode = 'none' | '4:3' | '16:10' | '5:4' | 'custom
 
 export type AdsMorphStyle = 'shrink' | 'dot-only' | 'fade';
 
+/** The four arms of a cross reticle. */
+export type ArmDirection = 'top' | 'bottom' | 'left' | 'right';
+
+/** Length and thickness of one arm, in overlay pixels. */
+export interface ArmSpec {
+  length: number;
+  thickness: number;
+}
+
 export interface CrosshairConfig {
   id: string;
   name: string;
   game: 'valorant' | 'cs2' | 'fortnite' | 'apex' | 'universal';
   isBuiltIn?: boolean;
+
+  /**
+   * Schema version this config was written with. Absent on every pre-v2 blob,
+   * which is how `normalizeCrosshairConfig` recognises legacy data.
+   */
+  schemaVersion?: number;
 
   // Topology
   topology: CrosshairTopology;
@@ -21,6 +36,35 @@ export interface CrosshairConfig {
   hasBottomArm: boolean;
   hasLeftArm: boolean;
   hasRightArm: boolean;
+
+  /* ------------------------------------------------------------------ *
+   * v2 — independent per-direction geometry
+   *
+   * Optional so every config saved before v2 stays valid. When
+   * `asymmetricArms` is false the global `length`/`thickness` above are used
+   * for all four arms, which is exactly the pre-v2 behaviour. Turn it on to
+   * give each direction its own values (e.g. top 8, bottom 12, left 8,
+   * right 12) and build asymmetric designs.
+   *
+   * Always read these through `resolveArmGeometry()` rather than directly, so
+   * the renderer and the editor can never disagree.
+   * ------------------------------------------------------------------ */
+  asymmetricArms?: boolean;
+  armLength?: Record<ArmDirection, number>;
+  armThickness?: Record<ArmDirection, number>;
+
+  // v2 — whole-reticle transform
+  /** Degrees, clockwise. Applied to the arms; a dot or ring is rotation-invariant. */
+  rotation?: number;
+  /** Overall size multiplier. 1 keeps the historical pixel-exact dimensions. */
+  scale?: number;
+
+  /* v2 — inner outline, drawn inset *inside* each element. Distinct from the
+   * outer outline above, which is drawn as a larger shape behind it. */
+  innerOutlineEnabled?: boolean;
+  innerOutlineColor?: string;
+  innerOutlineThickness?: number;
+  innerOutlineOpacity?: number;
 
   // Primary Color
   primaryColor: string;     // Hex (#00ffcc)

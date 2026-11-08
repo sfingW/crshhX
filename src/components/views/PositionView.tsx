@@ -1,7 +1,6 @@
 import React from 'react';
 import { CrosshairConfig, StretchedResolutionMode } from '../../types/crosshair';
-import { ReticleRenderer } from '../ReticleRenderer';
-import { Move, RotateCcw, Minus, Plus, Monitor } from 'lucide-react';
+import { RotateCcw, Minus, Plus } from 'lucide-react';
 
 interface PositionViewProps {
   config: CrosshairConfig;

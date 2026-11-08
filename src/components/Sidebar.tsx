@@ -1,17 +1,24 @@
 import React from 'react';
 import {
   Crosshair,
+  FolderOpen,
   Sliders,
   Move,
   Keyboard,
   ShieldCheck,
   Star,
-  Activity,
-  Layers,
-  Sparkles,
+  Zap,
 } from 'lucide-react';
 
-export type ActiveNavView = 'vault' | 'favorites' | 'designer' | 'calibration' | 'keybinds' | 'system';
+export type ActiveNavView =
+  | 'vault'
+  | 'favorites'
+  | 'library'
+  | 'designer'
+  | 'calibration'
+  | 'keybinds'
+  | 'weaponslots'
+  | 'system';
 
 interface SidebarProps {
   activeView: ActiveNavView;
@@ -78,6 +85,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onSelectView }) =>
               <Star className="w-4 h-4" />
               <span>Saved & Favorites</span>
             </button>
+
+            <button
+              onClick={() => onSelectView('library')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-md font-medium transition-all ${
+                activeView === 'library'
+                  ? 'bg-surface-card font-semibold'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-surface-cardHover'
+              }`}
+              style={{
+                color: activeView === 'library' ? 'var(--brand-accent)' : undefined,
+              }}
+            >
+              <FolderOpen className="w-4 h-4" />
+              <span>Preset Manager</span>
+            </button>
           </div>
 
           {/* Studio Section */}
@@ -134,6 +156,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onSelectView }) =>
             >
               <Keyboard className="w-4 h-4" />
               <span>Keybinds & ADS</span>
+            </button>
+
+            <button
+              onClick={() => onSelectView('weaponslots')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-md font-medium transition-all ${
+                activeView === 'weaponslots'
+                  ? 'bg-surface-card font-semibold'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-surface-cardHover'
+              }`}
+              style={{
+                color: activeView === 'weaponslots' ? 'var(--brand-accent)' : undefined,
+              }}
+            >
+              <Zap className="w-4 h-4" />
+              <span>Weapon Slots</span>
             </button>
           </div>
 

@@ -1,4 +1,5 @@
 import { CrosshairConfig, AppSettings } from '../types/crosshair';
+import { V2_DEFAULTS } from './crosshairSchema';
 
 export const PRO_PRESETS: CrosshairConfig[] = [
   {
@@ -355,7 +356,31 @@ export const PRO_PRESETS: CrosshairConfig[] = [
   }
 ];
 
-export const DEFAULT_CONFIG: CrosshairConfig = PRO_PRESETS[0];
+/**
+ * The crosshair a fresh install starts from, and the baseline the designer's
+ * "reset all parameters" returns to.
+ *
+ * It is built from the first pro preset so the out-of-box appearance is
+ * unchanged, but it deliberately spells out every schema-v2 field. A reset is
+ * applied as a merge over the current config, and a merge can only clear a key
+ * the baseline actually declares — without these, rotating a crosshair 45° and
+ * then resetting would leave it rotated.
+ *
+ * `PRO_PRESETS[0]` itself is not mutated: built-in presets are shared module
+ * constants and stay byte-identical to what the vault ships.
+ */
+export const DEFAULT_CONFIG: CrosshairConfig = {
+  ...PRO_PRESETS[0],
+  asymmetricArms: V2_DEFAULTS.asymmetricArms,
+  armLength: undefined,
+  armThickness: undefined,
+  rotation: V2_DEFAULTS.rotation,
+  scale: V2_DEFAULTS.scale,
+  innerOutlineEnabled: V2_DEFAULTS.innerOutlineEnabled,
+  innerOutlineColor: V2_DEFAULTS.innerOutlineColor,
+  innerOutlineThickness: V2_DEFAULTS.innerOutlineThickness,
+  innerOutlineOpacity: V2_DEFAULTS.innerOutlineOpacity,
+};
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   overlayVisible: true,
