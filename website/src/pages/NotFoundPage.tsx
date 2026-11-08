@@ -5,15 +5,17 @@ export function NotFoundPage() {
   return (
     <section className="nf">
       <div className="container">
-        <div style={{ display: 'grid', placeItems: 'center' }}>
+        <div className="nf-stage">
+          <span className="scan" aria-hidden="true" />
           <Reticle
             spec={{ color: '#3d4a54', length: 6, thickness: 2, gap: 10, dot: true, dotSize: 3 }}
-            size={120}
+            size={130}
           />
         </div>
         <p className="nf-code" aria-hidden="true">
           404
         </p>
+        <p className="nf-tag">// signal lost — recentering</p>
         <h1>This page is off-centre.</h1>
         <p>
           The address you followed does not exist on this site. The crosshair, at least, is

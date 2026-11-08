@@ -72,3 +72,10 @@
   --container: 1120px;
   --nav-h: 64px;
 }
+
+/* HUD instrumentation layer: hairline grid + the one allowed gradient. */
+:root {
+  --grid-line: rgba(111, 217, 192, 0.05);
+  --accent-2: #35e0ff;
+  --grad-accent: linear-gradient(90deg, var(--brand), var(--accent-2));
+}

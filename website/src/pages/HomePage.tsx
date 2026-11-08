@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
 import { Reveal } from '../components/Reveal';
 import { SectionHead } from '../components/Blocks';
-import { Reticle } from '../components/Reticle';
-import { DesignerMock, PRESET_SHOWCASE, SlotsMock } from '../components/ProductMock';
+import { Playground } from '../components/Playground';
+import { SlotsMock } from '../components/ProductMock';
 import {
   IconArrow,
   IconDownload,
@@ -47,7 +47,35 @@ const HIGHLIGHTS = [
   },
 ];
 
-const SHOWCASE = [0, 1, 5, 4];
+/** Profile tags the application's schema actually defines. */
+const GAME_TAGS = ['valorant', 'cs2', 'fortnite', 'apex', 'universal'];
+
+/** Numbers that can be checked in this repository right now. */
+const LEDGER = [
+  { num: '258', label: 'built-in presets in the shipped vault' },
+  { num: '5', label: 'weapon slots, every keybind re-recordable' },
+  { num: '2', label: 'planned distributions: installer and portable' },
+  { num: '0', label: 'accounts, telemetry or network calls after install' },
+];
+
+const FAQ = [
+  {
+    q: 'Does crshhx modify games or read their memory?',
+    a: 'No. It draws its own overlay window and observes keyboard and mouse input passively. It does not inject into, patch or read any game process.',
+  },
+  {
+    q: 'Is it safe with anti-cheat systems?',
+    a: 'That cannot be guaranteed by this project. crshhx does not touch game processes and consumes no input, but whether a given anti-cheat accepts any third-party overlay or input observer is the vendor’s decision and can change at any time. Check the rules of each game you play.',
+  },
+  {
+    q: 'Do I need an internet connection or an account?',
+    a: 'Neither. Fonts and assets are bundled, your library lives on your machine, and there is nothing to sign into. The application works fully offline after install.',
+  },
+  {
+    q: 'Will my crosshairs survive an update?',
+    a: 'Yes. Your data lives outside the install directory, and the storage migration confirms a copy before it records itself as complete. A migration that cannot be confirmed is retried on the next launch instead of being marked done.',
+  },
+];
 
 export function HomePage() {
   return (
@@ -82,15 +110,35 @@ export function HomePage() {
             </p>
           </div>
           <Reveal>
-            <DesignerMock />
+            <Playground />
           </Reveal>
+        </div>
+      </section>
+
+      <section className="strip-section">
+        <div className="container">
+          <div className="strip" role="list" aria-label="Profile tags supported by the schema">
+            {GAME_TAGS.map((tag) => (
+              <span className="strip-item" role="listitem" key={tag}>
+                {tag}
+              </span>
+            ))}
+          </div>
+          <div className="led-row">
+            {LEDGER.map((item) => (
+              <div className="led" key={item.num + item.label}>
+                <span className="led-num">{item.num}</span>
+                <span className="led-label">{item.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
       <section className="section">
         <div className="container">
           <SectionHead
-            eyebrow="What it does"
+            eyebrow="01 · What it does"
             title="One tool for the whole crosshair workflow"
             lead="Design a reticle, keep it organised, move it between machines, and have it change with your weapon — without touching the game itself."
           />
@@ -111,42 +159,9 @@ export function HomePage() {
       </section>
 
       <section className="section">
-        <div className="container">
-          <SectionHead
-            eyebrow="Customisation"
-            title="Every parameter you would want, and none you would not"
-            lead="Gap, thickness, per-arm lengths, outlines, centre dot, spread ring, rotation and scale — the same values the editor exposes, drawn here at true proportion."
-          />
-          <div className="showcase">
-            {SHOWCASE.map((index) => {
-              const preset = PRESET_SHOWCASE[index];
-              return (
-                <Reveal key={preset.name} as="div">
-                  <div className="showcase-item">
-                    <div className="stage" style={{ width: '100%', height: 132 }}>
-                      <Reticle spec={preset.spec} size={84} label={`${preset.name} crosshair`} />
-                    </div>
-                    <span className="showcase-name">{preset.name}</span>
-                    <div className="chips" style={{ justifyContent: 'center' }}>
-                      <span className="chip">len {preset.spec.length}</span>
-                      <span className="chip">thk {preset.spec.thickness}</span>
-                      <span className="chip">gap {preset.spec.gap}</span>
-                      {preset.spec.outline ? <span className="chip">outline</span> : null}
-                      {preset.spec.dot ? <span className="chip">dot</span> : null}
-                      {preset.spec.ring ? <span className="chip">ring</span> : null}
-                    </div>
-                  </div>
-                </Reveal>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section className="section">
         <div className="container feature-grid">
           <div className="feature-copy">
-            <span className="eyebrow">Weapon slots</span>
+            <span className="eyebrow">02 · Weapon slots</span>
             <h2>The reticle follows the weapon</h2>
             <p>
               Assign a crosshair to each slot and record the key that switches to it. crshhx
@@ -179,11 +194,7 @@ export function HomePage() {
 
       <section className="section">
         <div className="container">
-          <SectionHead
-            centered
-            eyebrow="How it works"
-            title="Three steps, all local"
-          />
+          <SectionHead centered eyebrow="03 · How it works" title="Three steps, all local" />
           <div className="steps">
             <div className="step">
               <span className="step-num">01</span>
@@ -209,6 +220,28 @@ export function HomePage() {
                 cycle presets with F9, or let weapon slots do the switching for you.
               </p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="container" style={{ maxWidth: 860 }}>
+          <SectionHead
+            eyebrow="04 · Before you install"
+            title="The questions everyone asks first"
+            lead="Honest answers on safety, compatibility and your data — the full list lives in the documentation."
+          />
+          {FAQ.map((item) => (
+            <details className="faq" key={item.q}>
+              <summary>{item.q}</summary>
+              <div className="faq-body">{item.a}</div>
+            </details>
+          ))}
+          <div style={{ marginTop: 24 }}>
+            <Link className="btn btn-secondary btn-sm" to="/docs#faq">
+              All questions, answered in the docs
+              <IconArrow />
+            </Link>
           </div>
         </div>
       </section>

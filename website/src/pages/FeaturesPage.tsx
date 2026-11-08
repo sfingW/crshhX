@@ -1,9 +1,12 @@
+import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Reveal } from '../components/Reveal';
 import { SectionHead } from '../components/Blocks';
+import { Reticle } from '../components/Reticle';
 import {
   DesignerMock,
   LibraryMock,
   OverlayMock,
+  PRESET_SHOWCASE,
   SlotsMock,
 } from '../components/ProductMock';
 
@@ -87,8 +90,35 @@ function ProfilesMock() {
   );
 }
 
-const SECTIONS = [
+function BloomDemo() {
+  return (
+    <div className="hud" style={{ padding: 20, marginBottom: 20 }}>
+      <div className="stage" style={{ minHeight: 190 }}>
+        <span className="demo-bloom">
+          <Reticle
+            spec={PRESET_SHOWCASE[0].spec}
+            size={120}
+            label="Dynamic firing bloom demonstration"
+          />
+        </span>
+        <span className="stage-hud">dynamic firing bloom · looped demonstration</span>
+      </div>
+    </div>
+  );
+}
+
+interface Section {
+  tab: string;
+  eyebrow: string;
+  title: string;
+  body: string;
+  points: ReadonlyArray<[string, string]>;
+  visual: ReactNode;
+}
+
+const SECTIONS: ReadonlyArray<Section> = [
   {
+    tab: 'Editor',
     eyebrow: '01 · Editor',
     title: 'A crosshair editor with real geometry',
     body: 'The editor works on the same schema the overlay renders: arm lengths and thickness per direction, gap, whole-reticle rotation and scale, an outline drawn behind each element and an inner outline drawn inside it. Colours come with contrast verdicts, because a reticle you cannot see is a defect, not a preference.',
@@ -100,6 +130,7 @@ const SECTIONS = [
     visual: <DesignerMock />,
   },
   {
+    tab: 'Preset library',
     eyebrow: '02 · Presets',
     title: 'A library, not a list',
     body: '258 built-in presets across Valorant, CS2, Fortnite and Apex, plus everything you make. Folders, favourites, descriptions and timestamps live in a sidecar keyed by preset id, so organising a built-in never modifies it and your own presets stay byte-compatible with weapon slots.',
@@ -111,6 +142,7 @@ const SECTIONS = [
     visual: <LibraryMock />,
   },
   {
+    tab: 'Import & export',
     eyebrow: '03 · Transfer',
     title: 'Import and export with a preview gate',
     body: 'Exports are a versioned transfer file that carries your values exactly as they are. Imports are planned before they are applied: you see every entry, every conflict and every repair, and choose per entry whether to keep yours, replace it or skip.',
@@ -122,6 +154,7 @@ const SECTIONS = [
     visual: <ImportPreviewMock />,
   },
   {
+    tab: 'Game profiles',
     eyebrow: '04 · Profiles',
     title: 'Profiles per game',
     body: 'Crosshairs are tagged for a game or marked universal. A profile can switch automatically when its game comes to the foreground, and can be restricted so switching only happens while a matched process is in front.',
@@ -133,6 +166,7 @@ const SECTIONS = [
     visual: <ProfilesMock />,
   },
   {
+    tab: 'Weapon slots',
     eyebrow: '05 · Weapon slots',
     title: 'Switching that keeps up with the fight',
     body: 'Bind a crosshair to each weapon slot and record the key that selects it. The passive input hook observes your keyboard without consuming a single event, so the game sees exactly what it would have seen without crshhx.',
@@ -144,6 +178,7 @@ const SECTIONS = [
     visual: <SlotsMock />,
   },
   {
+    tab: 'Overlay',
     eyebrow: '06 · Overlay',
     title: 'An overlay built to be forgotten',
     body: 'A dedicated topmost window, centred on the monitor you choose, drawing nothing but the reticle. It compensates for stretched resolutions, morphs when you aim down sights and expands with firing bloom if you want it to.',
@@ -152,11 +187,36 @@ const SECTIONS = [
       ['Stretched compensation.', '4:3, 16:10, 5:4 or a custom ratio, so the reticle stays square on stretched setups.'],
       ['ADS and bloom.', 'Shrink, dot-only or fade on aim; configurable expansion and decay on fire.'],
     ],
-    visual: <OverlayMock />,
+    visual: (
+      <>
+        <BloomDemo />
+        <OverlayMock />
+      </>
+    ),
   },
-] as const;
+];
 
 export function FeaturesPage() {
+  const [active, setActive] = useState(0);
+
+  const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const last = SECTIONS.length - 1;
+    let next: number | null = null;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+      next = index === last ? 0 : index + 1;
+    } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+      next = index === 0 ? last : index - 1;
+    } else if (event.key === 'Home') {
+      next = 0;
+    } else if (event.key === 'End') {
+      next = last;
+    }
+    if (next === null) return;
+    event.preventDefault();
+    setActive(next);
+    document.getElementById(`xtab-${next}`)?.focus();
+  };
+
   return (
     <>
       <section className="section" style={{ paddingTop: 'clamp(56px, 7vw, 96px)' }}>
@@ -165,32 +225,61 @@ export function FeaturesPage() {
             level={1}
             eyebrow="Features"
             title="What the application actually does"
-            lead="Six areas, described the way the product behaves. Every visual on this page is an illustrative rendering built from the application's real parameters; none of them is a screenshot."
+            lead="Six areas, described the way the product behaves. Pick a panel to explore it. Every visual on this page is an illustrative rendering built from the application's real parameters; none of them is a screenshot."
           />
         </div>
       </section>
 
-      {SECTIONS.map((section, index) => (
-        <section className="section" key={section.eyebrow}>
-          <div className={`container feature-grid${index % 2 === 1 ? ' flip' : ''}`}>
-            <div className="feature-copy">
-              <span className="eyebrow">{section.eyebrow}</span>
-              <h2>{section.title}</h2>
-              <p>{section.body}</p>
-              <ul className="feature-list">
-                {section.points.map(([strong, rest]) => (
-                  <li key={strong}>
-                    <strong>{strong}</strong> {rest}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="feature-visual">
-              <Reveal>{section.visual}</Reveal>
-            </div>
+      <section className="section explorer-section">
+        <div className="container explorer">
+          <div role="tablist" aria-orientation="vertical" aria-label="Feature areas" className="explorer-tabs">
+            {SECTIONS.map((section, index) => (
+              <button
+                key={section.eyebrow}
+                id={`xtab-${index}`}
+                role="tab"
+                type="button"
+                className={`xtab${index === active ? ' is-active' : ''}`}
+                aria-selected={index === active}
+                aria-controls={`xpanel-${index}`}
+                tabIndex={index === active ? 0 : -1}
+                onClick={() => setActive(index)}
+                onKeyDown={(event) => onTabKeyDown(event, index)}
+              >
+                <span className="xtab-num">{String(index + 1).padStart(2, '0')}</span>
+                <span className="xtab-label">{section.tab}</span>
+              </button>
+            ))}
           </div>
-        </section>
-      ))}
+
+          <div>
+            {SECTIONS.map((section, index) => (
+              <div
+                key={section.eyebrow}
+                id={`xpanel-${index}`}
+                role="tabpanel"
+                aria-labelledby={`xtab-${index}`}
+                hidden={index !== active}
+                className="xpanel"
+              >
+                <span className="eyebrow">{section.eyebrow}</span>
+                <h2>{section.title}</h2>
+                <p style={{ marginTop: 16, color: 'var(--text-dim)' }}>{section.body}</p>
+                <ul className="feature-list">
+                  {section.points.map(([strong, rest]) => (
+                    <li key={strong}>
+                      <strong>{strong}</strong> {rest}
+                    </li>
+                  ))}
+                </ul>
+                <div className="feature-visual">
+                  <Reveal>{section.visual}</Reveal>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
     </>
   );
 }

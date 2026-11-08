@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { NAV_LINKS } from '../site';
 import { BrandMark } from './Brand';
@@ -8,10 +8,30 @@ const HEADER_LINKS = NAV_LINKS.filter((route) => route.path !== '/download');
 
 export function Nav() {
   const [open, setOpen] = useState(false);
+  const [progress, setProgress] = useState(0);
   const { pathname } = useLocation();
+
+  useEffect(() => {
+    const onScroll = () => {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      setProgress(max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0);
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, []);
 
   return (
     <header className="nav">
+      <span
+        className="nav-progress"
+        style={{ transform: `scaleX(${progress})` }}
+        aria-hidden="true"
+      />
       <div className="container nav-inner">
         <Link
           className="brand"
