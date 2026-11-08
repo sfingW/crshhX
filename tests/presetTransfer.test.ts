@@ -433,7 +433,8 @@ describe('planImport decides safely', () => {
     const plan = planImport(envelope, { presets: [], settings: DEFAULT_APP_SETTINGS });
     expect(plan.settings.map((s) => s.key)).toEqual(['overlayVisible', 'selectedMonitor']);
     expect(plan.settings[0]).toMatchObject({ current: 'on', incoming: 'off' });
-    expect(plan.settings[1]).toMatchObject({ current: '0', incoming: '2' });
+    // Default monitor preference is AUTO_MONITOR (-1), not a display index.
+    expect(plan.settings[1]).toMatchObject({ current: '-1', incoming: '2' });
   });
 
   it('says so when the settings already match', () => {

@@ -1,9 +1,22 @@
-import { app, BrowserWindow, ipcMain, globalShortcut, net, protocol, screen, session } from 'electron';
+import { app, BrowserWindow, ipcMain, globalShortcut, Menu, net, nativeImage, protocol, screen, session, Tray } from 'electron';
 import * as path from 'path';
 import { pathToFileURL } from 'url';
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { WeaponSlotSwitchService } from './services/weaponSlotService';
 import type { WeaponSlotsRuntime } from '../src/lib/weaponSlots/types';
+import { AUTO_MONITOR, createDisplayMonitor } from './services/displayService';
+import type { DisplayMonitor } from './services/displayService';
+import { createBackgroundMode } from './services/backgroundMode';
+import type { BackgroundMode } from './services/backgroundMode';
+import { createTrayController, resolveTrayIconPath } from './services/trayService';
+import type { TrayController } from './services/trayService';
+import {
+  WINDOW_CONTROL_CHANNELS,
+  attachMaximizeReporting,
+  buildStudioMenuTemplate,
+  registerWindowControls,
+} from './services/windowChrome';
+import type { DisplaysSnapshot } from '../src/types/electron';
 import {
   APP_HOST,
   APP_ORIGIN,
@@ -52,6 +65,24 @@ protocol.registerSchemesAsPrivileged([
  */
 app.setPath('userData', path.join(app.getPath('appData'), app.getName()));
 
+/*
+ * One instance, one overlay. A second launch — a desktop shortcut while the
+ * app lives in the tray, or a double-clicked portable exe — must restore the
+ * running instance's window instead of starting a competing process with a
+ * second overlay window and a second set of global input hooks.
+ */
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    // Restoring the existing window is the whole point of the lock. Before
+    // the app is ready there is nothing to restore yet — the window is on its
+    // way anyway.
+    backgroundMode?.handleSecondInstance();
+  });
+}
+
 /** Location of the Vite renderer bundle. Derived, never hardcoded — see
  *  `resolveRendererDist`, which handles the packaged (asar) and dev layouts. */
 const RENDERER_DIST = resolveRendererDist({
@@ -63,6 +94,21 @@ const RENDERER_DIST = resolveRendererDist({
 let studioWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
 let weaponSlots: WeaponSlotSwitchService | null = null;
+let displayMonitor: DisplayMonitor | null = null;
+let trayController: TrayController | null = null;
+let backgroundMode: BackgroundMode | null = null;
+
+/**
+ * Target-monitor preference: AUTO_MONITOR (follow the primary display) or an
+ * Electron display id. The renderer pushes the persisted value at startup;
+ * until then the overlay follows the primary display, which is also the safe
+ * fallback for any stale id (see services/displayService.ts).
+ */
+let monitorPreference: number = AUTO_MONITOR;
+
+/** "Keep overlays running when the window is closed". Default enabled; the
+ *  renderer pushes the persisted value at startup. */
+let keepOverlaysOnClose = true;
 
 let isOverlayVisible = true;
 let currentConfig: any = null;
@@ -80,6 +126,10 @@ function send(channel: string, window: BrowserWindow | null, payload?: unknown) 
 }
 
 function createStudioWindow() {
+  // Idempotent: reopening from the tray or a second instance must never create
+  // a second studio window (see showStudioWindow).
+  if (studioWindow && !studioWindow.isDestroyed()) return;
+
   studioWindow = new BrowserWindow({
     width: 1320,
     height: 880,
@@ -87,6 +137,12 @@ function createStudioWindow() {
     minHeight: 720,
     backgroundColor: '#0a0d14',
     title: 'Crshhx Studio | Precision Crosshair Suite',
+    // Frameless: no native title bar, no native menu bar, no native window
+    // buttons. The renderer's TopHeader is the ONE application header — it is
+    // the drag region and carries the minimise/maximise/close controls, wired
+    // through services/windowChrome.ts. Resizing keeps working: Windows gives
+    // frameless windows their invisible resize borders.
+    frame: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -109,19 +165,49 @@ function createStudioWindow() {
   studioWindow.on('focus', () => weaponSlots?.setStudioFocused(true));
   studioWindow.on('blur', () => weaponSlots?.setStudioFocused(false));
 
+  // The frameless header's maximise/restore icon must follow the real window
+  // state — including changes made outside the header (double-clicking the
+  // drag region, Win+Up/Down, the taskbar). The renderer seeds itself at
+  // startup through the WINDOW_CONTROL_CHANNELS.isMaximized query.
+  attachMaximizeReporting(studioWindow, (maximized) => {
+    send(WINDOW_CONTROL_CHANNELS.maximizeChanged, studioWindow, maximized);
+  });
+
+  // The X button hides the studio to the tray while background operation is
+  // enabled — the overlay, the global input hooks and weapon-slot switching
+  // all keep running. With the setting off, or an explicit quit already
+  // underway, the close proceeds and the application exits as it always did.
+  studioWindow.on('close', (event) => {
+    backgroundMode?.handleStudioClose(event);
+  });
+
   studioWindow.on('closed', () => {
     studioWindow = null;
     weaponSlots?.setStudioFocused(false);
-    // If studio is closed, we can keep overlay running or close if user quits
-    if (process.platform !== 'darwin') {
+    // Background operation disabled: closing the studio exits the app. With
+    // it enabled, the app lives on in the tray and can be reopened from there
+    // or by a second launch.
+    if (!keepOverlaysOnClose && process.platform !== 'darwin') {
       app.quit();
     }
   });
 }
 
+/** The display the overlay should occupy right now, per the stored preference. */
+function currentTargetDisplay() {
+  return displayMonitor ? displayMonitor.resolve(monitorPreference) : null;
+}
+
 function createOverlayWindow() {
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width, height, x, y } = primaryDisplay.bounds;
+  // Idempotent: there is exactly one overlay window for the process lifetime.
+  if (overlayWindow && !overlayWindow.isDestroyed()) return;
+
+  // The selected display's own bounds — never offsets computed from the
+  // primary — so monitors at negative coordinates (left of / above the
+  // primary) and mixed-DPI arrangements are positioned by the OS-reported
+  // geometry of the display itself.
+  const { width, height, x, y } =
+    currentTargetDisplay()?.bounds ?? screen.getPrimaryDisplay().bounds;
 
   overlayWindow = new BrowserWindow({
     x,
@@ -171,24 +257,97 @@ function createOverlayWindow() {
   });
 }
 
+/**
+ * Moves and resizes the overlay so it covers exactly the selected display.
+ * Called on creation, on a preference change, and on every display event
+ * (added / removed / metrics changed), so a resolution or scaling change
+ * repositions the overlay immediately and a disconnected selection falls
+ * back to the primary display inside `resolve`.
+ */
+function positionOverlayWindow() {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  const target = currentTargetDisplay();
+  // No display information at all: leave the overlay where it is rather than
+  // guess a position.
+  if (!target) return;
+  overlayWindow.setBounds({
+    x: target.bounds.x,
+    y: target.bounds.y,
+    width: target.bounds.width,
+    height: target.bounds.height,
+  });
+}
+
+/**
+ * The single owner of overlay visibility. The F10 hotkey, the toggle IPC, the
+ * settings push and the tray menu item all come through here, so the overlay,
+ * the studio UI and the tray menu can never disagree about the state.
+ */
+function setOverlayVisible(visible: boolean) {
+  isOverlayVisible = visible;
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    if (visible) {
+      overlayWindow.showInactive();
+    } else {
+      overlayWindow.hide();
+    }
+    overlayWindow.webContents.send('overlay-visibility-changed', visible);
+  }
+  send('overlay-visibility-changed', studioWindow, visible);
+  trayController?.sync();
+}
+
+/** Restores the studio window, creating it only if it is truly gone. */
+function showStudioWindow() {
+  if (studioWindow && !studioWindow.isDestroyed()) {
+    if (!studioWindow.isVisible()) studioWindow.show();
+    studioWindow.focus();
+    return;
+  }
+  createStudioWindow();
+}
+
+/**
+ * The system tray icon: reopen the studio, toggle overlays, quit. A missing
+ * icon file costs the tray, never the application — createTrayController
+ * tolerates a null tray (see services/trayService.ts).
+ */
+function createTray() {
+  const iconPath = resolveTrayIconPath({
+    appPath: app.getAppPath(),
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    platform: process.platform,
+  });
+  trayController = createTrayController({
+    createTray: () => {
+      try {
+        const icon = nativeImage.createFromPath(iconPath);
+        if (icon.isEmpty()) {
+          console.warn(`[crshhx] Tray icon not found at ${iconPath}; running without a tray.`);
+          return null;
+        }
+        return new Tray(icon);
+      } catch (err) {
+        console.warn('[crshhx] Could not create the tray icon:', err);
+        return null;
+      }
+    },
+    buildMenu: (template) => Menu.buildFromTemplate(template),
+    onOpen: () => showStudioWindow(),
+    onToggleOverlays: () => setOverlayVisible(!isOverlayVisible),
+    onQuit: () => backgroundMode?.quitFromTray(),
+    isOverlayVisible: () => isOverlayVisible,
+  });
+}
+
 function registerHotkeys(toggleKey = 'F10', cycleKey = 'F9') {
   globalShortcut.unregisterAll();
 
   // Overlay visibility toggle
   try {
     globalShortcut.register(toggleKey, () => {
-      isOverlayVisible = !isOverlayVisible;
-      if (overlayWindow) {
-        if (isOverlayVisible) {
-          overlayWindow.showInactive();
-        } else {
-          overlayWindow.hide();
-        }
-        overlayWindow.webContents.send('overlay-visibility-changed', isOverlayVisible);
-      }
-      if (studioWindow) {
-        studioWindow.webContents.send('overlay-visibility-changed', isOverlayVisible);
-      }
+      setOverlayVisible(!isOverlayVisible);
     });
   } catch (err) {
     console.warn(`Failed to register hotkey ${toggleKey}:`, err);
@@ -450,6 +609,10 @@ async function migrateStorageOrigin(): Promise<string> {
 }
 
 app.whenReady().then(async () => {
+  // A second instance that lost the lock has already called app.quit(); it
+  // must not go on to create windows.
+  if (!gotSingleInstanceLock) return;
+
   registerRendererProtocol();
   registerContentSecurityPolicy();
 
@@ -457,8 +620,63 @@ app.whenReady().then(async () => {
   // would otherwise claim the keys the migration needs to fill.
   console.log(`[crshhx] ${await migrateStorageOrigin()}`);
 
+  // Must precede window creation: the overlay is positioned from the selected
+  // display, and hotplug/metrics events start being observed from here.
+  displayMonitor = createDisplayMonitor(screen, (reason) => {
+    // A resolution or scaling change moves the overlay immediately; a
+    // connect/disconnect also refreshes the studio's dropdown. A disconnected
+    // selection falls back to the primary display inside resolve().
+    positionOverlayWindow();
+    send('displays-changed', studioWindow, displayMonitor?.list() ?? []);
+    console.log(
+      `[crshhx] Displays changed (${reason}); overlay on display ${currentTargetDisplay()?.id ?? 'none'}`,
+    );
+  });
+
+  // Close-to-tray lifecycle. All deps are lazy getters, so this can be built
+  // before the tray and windows it references exist.
+  backgroundMode = createBackgroundMode({
+    keepOverlaysOnClose: () => keepOverlaysOnClose,
+    getStudioWindow: () => studioWindow,
+    getOverlayWindow: () => overlayWindow,
+    destroyTray: () => {
+      trayController?.destroy();
+      trayController = null;
+    },
+    trayActive: () => trayController !== null,
+    disposeInputHooks: () => {
+      weaponSlots?.dispose();
+      weaponSlots = null;
+    },
+    unregisterShortcuts: () => globalShortcut.unregisterAll(),
+    quitApp: () => app.quit(),
+    showStudio: () => showStudioWindow(),
+  });
+
+  // Frameless chrome. The application menu exists only for its keyboard
+  // accelerators (clipboard, undo, zoom, DevTools) — a frameless window never
+  // shows a menu bar, and dropping the menu entirely would break Ctrl+C/V/Z
+  // in every text field. The window-control IPC is registered once; handlers
+  // resolve the studio window lazily, so tray reopens keep working.
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate(
+      buildStudioMenuTemplate() as unknown as Electron.MenuItemConstructorOptions[],
+    ),
+  );
+  registerWindowControls({
+    onControl: (channel, handler) => {
+      ipcMain.on(channel, handler);
+    },
+    onQuery: (channel, handler) => {
+      ipcMain.handle(channel, handler);
+    },
+    getWindow: () => studioWindow,
+  });
+
   createOverlayWindow();
+  positionOverlayWindow();
   createStudioWindow();
+  createTray();
   registerHotkeys();
   createWeaponSlotService();
 
@@ -470,15 +688,32 @@ app.whenReady().then(async () => {
   });
 });
 
+app.on('before-quit', () => {
+  // A real exit is starting (from any source): closes must stop being
+  // intercepted, or the quit would hide the window and hang the exit.
+  backgroundMode?.handleBeforeQuit();
+});
+
 app.on('will-quit', () => {
-  // Remove the global input hook before the process goes away.
+  // Remove the global input hook before the process goes away, destroy the
+  // tray icon, and detach the display listeners. All idempotent — the tray
+  // Quit path has usually done this already.
   weaponSlots?.dispose();
   weaponSlots = null;
   globalShortcut.unregisterAll();
+  trayController?.destroy();
+  trayController = null;
+  displayMonitor?.dispose();
+  displayMonitor = null;
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+  // Hidden windows are not closed windows; this fires only when everything
+  // really went away. Background operation with a live tray is the one case
+  // where that must not exit the application.
+  if (backgroundMode) {
+    backgroundMode.handleWindowAllClosed();
+  } else if (process.platform !== 'darwin') {
     app.quit();
   }
 });
@@ -493,15 +728,24 @@ ipcMain.on('update-crosshair', (_event, config) => {
 
 ipcMain.on('update-settings', (_event, settings) => {
   if (typeof settings.overlayVisible === 'boolean') {
-    isOverlayVisible = settings.overlayVisible;
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      if (isOverlayVisible) {
-        overlayWindow.showInactive();
-      } else {
-        overlayWindow.hide();
-      }
-      overlayWindow.webContents.send('overlay-visibility-changed', isOverlayVisible);
-    }
+    setOverlayVisible(settings.overlayVisible);
+  }
+
+  // Target monitor: applied the moment the dropdown changes, so switching
+  // displays moves the overlay immediately. The preference itself is persisted
+  // by the renderer; the main process only holds it for this run.
+  if (
+    typeof settings.selectedMonitor === 'number' &&
+    Number.isFinite(settings.selectedMonitor)
+  ) {
+    const changed = settings.selectedMonitor !== monitorPreference;
+    monitorPreference = settings.selectedMonitor;
+    if (changed) positionOverlayWindow();
+  }
+
+  // Close-to-tray behaviour; consumed by the studio close handler.
+  if (typeof settings.keepOverlaysOnClose === 'boolean') {
+    keepOverlaysOnClose = settings.keepOverlaysOnClose;
   }
 
   if (settings.toggleOverlayHotkey || settings.cyclePresetHotkey) {
@@ -510,15 +754,19 @@ ipcMain.on('update-settings', (_event, settings) => {
 });
 
 ipcMain.on('toggle-overlay', () => {
-  isOverlayVisible = !isOverlayVisible;
-  if (overlayWindow && !overlayWindow.isDestroyed()) {
-    if (isOverlayVisible) {
-      overlayWindow.showInactive();
-    } else {
-      overlayWindow.hide();
-    }
-    overlayWindow.webContents.send('overlay-visibility-changed', isOverlayVisible);
-  }
+  setOverlayVisible(!isOverlayVisible);
+});
+
+/* ------------------------------------------------------------------ *
+ * Target Monitor IPC
+ * ------------------------------------------------------------------ */
+
+/** Enumerated live from Electron's display APIs on every call — never cached,
+ *  never hardcoded. */
+ipcMain.handle('displays:list', (): DisplaysSnapshot => {
+  const displays = displayMonitor?.list() ?? [];
+  const target = displayMonitor?.resolve(monitorPreference) ?? null;
+  return { displays, preference: monitorPreference, targetId: target ? target.id : null };
 });
 
 /* ------------------------------------------------------------------ *

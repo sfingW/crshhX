@@ -58,6 +58,8 @@ exports.MIGRATED_STORAGE_KEYS = [
     'crshhx_favorites',
     'crshhx_preset_library',
     'crshhx_theme_accent',
+    /** Crosshair Academy completion ticks — small, but it is the user's data. */
+    'crshhx_academy_progress',
     migration_1.WEAPON_SLOTS_STORAGE_KEY,
     migration_1.WEAPON_SLOTS_RUNTIME_KEY,
 ];

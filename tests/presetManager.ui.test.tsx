@@ -523,8 +523,9 @@ describe('ImportPreviewModal', () => {
     const overlayRow = within(dialog).getByText('Overlay visible').closest('div')!;
     expect(overlayRow.textContent).toBe('Overlay visibleon → off');
     expect(within(dialog).getByText('Selected monitor')).toBeTruthy();
+    // The default preference is AUTO_MONITOR (-1): follow the primary display.
     expect(within(dialog).getByText('Selected monitor').closest('div')!.textContent).toBe(
-      'Selected monitor0 → 2',
+      'Selected monitor-1 → 2',
     );
 
     fireEvent.click(within(dialog).getByText(/Import 0 crosshairs/));

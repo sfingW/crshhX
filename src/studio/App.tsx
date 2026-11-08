@@ -18,6 +18,7 @@ import {
   markModified,
   markUsed,
   pruneOrphans,
+  toggleFavourite,
   type PresetLibraryState,
 } from '../lib/presetOrganizer';
 import {
@@ -38,6 +39,8 @@ import { DesignerTabbedView } from '../components/views/DesignerTabbedView';
 import { KeybindsView } from '../components/views/KeybindsView';
 import { WeaponSlotsView } from '../components/views/WeaponSlotsView';
 import { PositionView } from '../components/views/PositionView';
+import { ProCrosshairsView } from '../components/views/ProCrosshairsView';
+import { AcademyView } from '../components/views/AcademyView';
 import { ShareImportModal } from '../components/modals/ShareImportModal';
 import { COMPLETE_CROSSHAIR_VAULT } from '../lib/crosshairCollection';
 import { ThemeAccent, applyThemeAccent, loadSavedThemeAccent } from '../lib/theme';
@@ -107,6 +110,18 @@ export const App: React.FC = () => {
   useEffect(() => {
     applyThemeAccent(currentAccent);
   }, [currentAccent]);
+
+  /*
+   * Hand the main process the persisted settings at startup. The overlay must
+   * be positioned on the saved target monitor and the close-to-tray behaviour
+   * must be known before the user edits anything — without this push, both
+   * would sit at main-process defaults until the first settings change.
+   */
+  useEffect(() => {
+    window.electronAPI?.updateAppSettings(appSettings);
+    // Runs once on mount with the settings as loaded from storage.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* Load once, migrating and repairing whatever is on disk. */
   useEffect(() => {
@@ -556,6 +571,20 @@ export const App: React.FC = () => {
             />
           )}
 
+          {activeView === 'procrosshairs' && (
+            <ProCrosshairsView
+              currentConfigId={config.id}
+              favouriteIds={Object.keys(presetLibrary.entries).filter(
+                (id) => presetLibrary.entries[id]?.favourite,
+              )}
+              onApply={handleSelectCrosshair}
+              onEdit={handleOpenDesignerWithConfig}
+              onToggleFavourite={(id) => commitLibrary(toggleFavourite(presetLibrary, id))}
+            />
+          )}
+
+          {activeView === 'academy' && <AcademyView />}
+
           {activeView === 'designer' && (
             <DesignerTabbedView
               config={config}
@@ -569,6 +598,12 @@ export const App: React.FC = () => {
               config={config}
               onChange={handleConfigChange}
               onResetCenter={() => handleConfigChange({ offsetX: 0, offsetY: 0 })}
+              settings={appSettings}
+              onUpdateSettings={(patch) => {
+                const next = { ...appSettings, ...patch };
+                setAppSettings(next);
+                saveAppSettings(next);
+              }}
             />
           )}
 

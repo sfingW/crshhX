@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Share2,
   Download,
   Minus,
   Square,
+  Copy,
   X,
   Search,
   Palette,
@@ -42,8 +43,33 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   weaponSlotStatus = null,
   weaponSlotPulse = false,
 }) => {
+  // Frameless window chrome. Outside Electron (plain browser) there is no
+  // window to control, so the buttons are not rendered at all — no dead icons.
+  const chrome = typeof window !== 'undefined' ? window.electronAPI : undefined;
+  const canControlWindow = typeof chrome?.windowMinimize === 'function';
+
+  const [maximized, setMaximized] = useState(false);
+  useEffect(() => {
+    const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+    if (typeof api?.windowMinimize !== 'function') return;
+    let active = true;
+    api
+      .isWindowMaximized?.()
+      .then((value) => {
+        if (active) setMaximized(Boolean(value));
+      })
+      .catch(() => {
+        // Query unavailable: the icon keeps its default until an event arrives.
+      });
+    const dispose = api.onWindowMaximizedChanged?.((value) => setMaximized(Boolean(value)));
+    return () => {
+      active = false;
+      dispose?.();
+    };
+  }, []);
+
   return (
-    <header className="h-12 bg-surface-sidebar border-b border-surface-border flex items-center justify-between px-6 select-none shrink-0 text-xs">
+    <header className="titlebar-drag h-12 bg-surface-sidebar border-b border-surface-border flex items-center justify-between px-6 select-none shrink-0 text-xs">
       {/* Search & Tabs */}
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-2 bg-surface-card px-2.5 py-1 rounded-md border border-surface-border">
@@ -166,12 +192,39 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           <span className="text-[10px] text-zinc-500 font-normal">[F10]</span>
         </button>
 
-        {/* Window controls */}
-        <div className="flex items-center gap-3 text-zinc-500 ml-1">
-          <Minus className="w-3.5 h-3.5 hover:text-zinc-300 cursor-pointer" />
-          <Square className="w-3 h-3 hover:text-zinc-300 cursor-pointer" />
-          <X className="w-3.5 h-3.5 hover:text-zinc-300 cursor-pointer" />
-        </div>
+        {/* Window controls — the only set in the application. Close raises the
+            window's close event, so close-to-tray behaves exactly as before. */}
+        {canControlWindow && (
+          <div className="flex items-center text-zinc-500 ml-1">
+            <button
+              type="button"
+              onClick={() => chrome?.windowMinimize?.()}
+              aria-label="Minimize window"
+              title="Minimize"
+              className="w-8 h-8 grid place-items-center rounded-md hover:bg-surface-cardHover hover:text-zinc-200 transition-colors"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => chrome?.windowToggleMaximize?.()}
+              aria-label={maximized ? 'Restore window' : 'Maximize window'}
+              title={maximized ? 'Restore' : 'Maximize'}
+              className="w-8 h-8 grid place-items-center rounded-md hover:bg-surface-cardHover hover:text-zinc-200 transition-colors"
+            >
+              {maximized ? <Copy className="w-3 h-3" /> : <Square className="w-3 h-3" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => chrome?.windowClose?.()}
+              aria-label="Close window"
+              title="Close"
+              className="w-8 h-8 grid place-items-center rounded-md hover:bg-red-500/15 hover:text-red-300 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );

@@ -29,6 +29,11 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     onAdsChanged: (callback) => {
         electron_1.ipcRenderer.on('ads-changed', (_event, active) => callback(active));
     },
+    /* ---------------- Target Monitor ---------------- */
+    /** Connected displays, the persisted preference and the current overlay target. */
+    listDisplays: () => electron_1.ipcRenderer.invoke('displays:list'),
+    /** Fires when a display is connected, disconnected or changes metrics. */
+    onDisplaysChanged: (callback) => subscribe('displays-changed', callback),
     /* ---------------- Weapon Slot Crosshairs ---------------- */
     /** Pushes the resolved runtime snapshot to the main process. */
     applyWeaponSlotsRuntime: (runtime) => {
@@ -45,4 +50,19 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     getWeaponSlotStatus: () => electron_1.ipcRenderer.invoke('weapon-slots:get-status'),
     onWeaponSlotSwitched: (callback) => subscribe('weapon-slot-switched', callback),
     onWeaponSlotStatus: (callback) => subscribe('weapon-slot-status', callback),
+    /* ---------------- Window chrome (frameless header) ---------------- */
+    windowMinimize: () => {
+        electron_1.ipcRenderer.send('window:minimize');
+    },
+    windowToggleMaximize: () => {
+        electron_1.ipcRenderer.send('window:toggle-maximize');
+    },
+    /** Raises the window's close event, so close-to-tray keeps working. */
+    windowClose: () => {
+        electron_1.ipcRenderer.send('window:close');
+    },
+    /** Current maximised state, so the header seeds the right icon at startup. */
+    isWindowMaximized: () => electron_1.ipcRenderer.invoke('window:is-maximized'),
+    /** Fires on every maximise/restore transition. Returns an unsubscribe function. */
+    onWindowMaximizedChanged: (callback) => subscribe('window:maximize-changed', callback),
 });

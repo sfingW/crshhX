@@ -84,3 +84,21 @@ input[type="range"]:active::-webkit-slider-thumb {
 ::-webkit-scrollbar-thumb:hover {
   background: #3b3f4f;
 }
+
+/* Frameless window chrome.
+   The studio window has no native title bar: the TopHeader and the sidebar's
+   brand row are the drag regions that move the window. Every interactive
+   element inside a drag region must opt back out, or clicks turn into drags.
+   Outside Electron (plain browser builds) these rules are inert. */
+.titlebar-drag {
+  -webkit-app-region: drag;
+}
+
+.titlebar-drag button,
+.titlebar-drag input,
+.titlebar-drag a,
+.titlebar-drag select,
+.titlebar-drag textarea,
+.titlebar-drag [role='button'] {
+  -webkit-app-region: no-drag;
+}

@@ -419,3 +419,40 @@ export function savePresetLibrary(state: PresetLibraryState): void {
     console.error('Failed to save the preset library:', err);
   }
 }
+
+/* ------------------------------------------------------------------ *
+ * Crosshair Academy progress
+ *
+ * One small record: tutorial id → ISO timestamp of when the user marked it
+ * complete. Deliberately separate from every other key, so a corrupt entry
+ * can only ever cost the progress ticks — never crosshairs or settings.
+ * ------------------------------------------------------------------ */
+
+const ACADEMY_PROGRESS_KEY = 'crshhx_academy_progress';
+
+export type AcademyProgress = Record<string, string>;
+
+export function loadAcademyProgress(): AcademyProgress {
+  try {
+    const raw = localStorage.getItem(ACADEMY_PROGRESS_KEY);
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const out: AcademyProgress = {};
+    for (const [id, at] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof at === 'string') out[id] = at;
+    }
+    return out;
+  } catch (err) {
+    console.error('Failed to read academy progress:', err);
+    return {};
+  }
+}
+
+export function saveAcademyProgress(progress: AcademyProgress): void {
+  try {
+    localStorage.setItem(ACADEMY_PROGRESS_KEY, JSON.stringify(progress));
+  } catch (err) {
+    console.error('Failed to save academy progress:', err);
+  }
+}

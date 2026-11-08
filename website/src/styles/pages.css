@@ -321,6 +321,8 @@
 .dl-meta dd {
   margin: 0;
   color: var(--text-dim);
+  /* A published SHA-256 is 64 unbroken characters; let it wrap in the card. */
+  overflow-wrap: anywhere;
 }
 
 .dl-note {

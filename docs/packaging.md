@@ -170,6 +170,16 @@ directory — deliberately outside the install directory, and pinned there by
 `app.setPath('userData', …)` in `main.ts` so that a portable exe keeps its data
 when moved.
 
+`extraResources` copies `build/icon.ico` (and `build/icon.png` for non-Windows
+development) next to the executable's resources directory. The system tray icon
+must be a real file on disk at runtime — the icon embedded in the `.exe` cannot
+be read back by Electron — and `resolveTrayIconPath` in
+`electron/services/trayService.ts` resolves exactly those two destinations.
+`tests/buildLayout.test.ts` pins the two halves of that contract together. A
+missing icon costs the tray, never the application: the app then runs without
+one and closing the window can only be undone by launching again, which the
+single-instance lock turns into a window restore.
+
 ## Known limitations of builds produced on Linux
 
 A Windows build made from Linux cannot run `rcedit`, the tool that stamps the
