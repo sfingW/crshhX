@@ -325,12 +325,50 @@ describe('footprint: nothing ships that the packaged app cannot use', () => {
   it('runs the storage migration at most once per install', () => {
     expect(mainSource).toContain('MIGRATION_MARKER_NAME');
     expect(mainSource).toContain('shouldRunMigration(');
-    // A failed attempt must not write the marker, or the retry never happens.
     const start = mainSource.indexOf('async function migrateStorageOrigin');
     const body = mainSource.slice(start, mainSource.indexOf('\n}\n', start));
+
+    // A failed attempt must not write the marker, or the retry never happens.
     const catchBlock = body.slice(body.indexOf('} catch (err) {'));
     expect(catchBlock).not.toContain('markerContents');
     expect(body).toContain('markerContents');
+
+    // Exactly one write site, guarded by the one function that decides whether the
+    // attempt finished. The bug this pins: an early `return` on the "nothing to
+    // copy" path skipped the marker, so every launch of every fresh install rebuilt
+    // the probe window and re-read both origins before the overlay could appear.
+    expect(body.match(/markerContents\(/g)).toHaveLength(1);
+    expect(body).toContain('decideMigration(');
+    expect(body).toContain('if (decision.writeMarker)');
+    expect(body.indexOf('if (decision.writeMarker)')).toBeLessThan(body.indexOf('markerContents('));
+    expect(body).not.toContain('return describeMigration(');
+  });
+
+  it('migrates storage over IPC rather than by evaluating a script', () => {
+    // `executeJavaScript` is evaluated inside the document, so whether the
+    // migration worked at all would depend on the production CSP — which is
+    // `script-src 'self'` with no `'unsafe-eval'`. A preload is not governed by
+    // the document's policy, and IPC is not a CSP-governed fetch. The word may
+    // still appear in a comment explaining that; what must not exist is a call.
+    expect(mainSource).not.toMatch(/executeJavaScript\s*\(/);
+    expect(mainSource).not.toMatch(/insertCSS\s*\(/);
+    expect(mainSource).toContain('probePreload.js');
+    expect(existsSync(join(ROOT, 'electron', 'probePreload.ts'))).toBe(true);
+
+    const preload = readFileSync(join(ROOT, 'electron', 'probePreload.ts'), 'utf8');
+    expect(preload).toContain('ipcRenderer.on(');
+    expect(preload).toContain('ipcRenderer.send(');
+    // The probe window stays sandboxed, so the preload may import `electron` but
+    // no relative module at runtime: types only.
+    expect(preload).toContain("import type { ProbeReply, ProbeRequest }");
+    expect(preload).not.toMatch(/^import\s+(?!type)[^;]*from '\.\//m);
+
+    // The channel name is declared in both files and cannot be imported in either
+    // direction, so the two literals are pinned together here.
+    const inPreload = /PROBE_CHANNEL = '([^']+)'/.exec(preload)?.[1];
+    const inMain = /PROBE_CHANNEL = '([^']+)'/.exec(mainSource)?.[1];
+    expect(inPreload).toBeTruthy();
+    expect(inMain).toBe(inPreload);
   });
 });
 
@@ -346,6 +384,29 @@ describe('packaging: the Windows release workflow is the sanctioned path', () =>
     expect(workflow).toContain('needs: quality');
     expect(workflow).toContain('npm test');
     expect(workflow).toContain('npx tsc -p tsconfig.json --noEmit');
+  });
+
+  it('gives a pull request the quality gate, and only that', () => {
+    expect(workflow).toContain('pull_request:');
+    expect(workflow).toContain('branches:');
+    expect(workflow).toContain('- main');
+    // The executables are still produced by a tag or a manual run.
+    expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).toContain("- 'v*'");
+    // The Windows job costs about ten minutes of runner time and produces
+    // artifacts nobody installs from a pull request, so it skips them.
+    expect(workflow).toContain("if: github.event_name != 'pull_request'");
+  });
+
+  it('asks for no permission it does not need', () => {
+    // Checkout reads the repository; upload-artifact writes into its own run,
+    // which the run token already allows. Nothing here pushes or publishes.
+    expect(workflow).toContain('permissions:');
+    expect(workflow).toContain('contents: read');
+    expect(workflow).not.toMatch(/contents:\s*write/);
+    expect(workflow).not.toMatch(/packages:\s*write/);
+    expect(workflow).not.toMatch(/id-token:\s*write/);
+    expect(workflow).not.toMatch(/pull-requests:\s*write/);
   });
 
   it('reports measured sizes and hashes instead of letting anyone guess', () => {

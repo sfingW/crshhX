@@ -60,7 +60,9 @@ before creating any window. The rules are blunt on purpose:
 
 - Copy a key **only if the destination does not already have it**. The new origin
   may already hold newer data; overwriting would destroy it.
-- A missing or unreadable source is a no-op, never an error.
+- A missing or **empty** source is a no-op, and it finishes the migration. An
+  *unreadable* one is an error, because nobody can then know what was there: it is
+  retried on the next launch instead of being marked finished.
 - The source is never deleted. A failed migration stays recoverable by hand.
 
 The write has to happen **before the studio window boots**, because the app
@@ -68,6 +70,44 @@ persists first-run defaults (it seeds the starter favourites) and would otherwis
 claim exactly the keys the migration needs to fill. Hence a hidden same-origin
 document at `app://crshhx/__storage-probe.html`, which serves no script and
 renders nothing.
+
+### How the probe talks to that document
+
+Through `electron/probePreload.ts` and IPC — not through `executeJavaScript`.
+
+The migration originally built two JavaScript source strings out of stored values
+and evaluated them in the document. That had two problems: whether evaluated code
+runs at all depends on the document's CSP, and this app ships `script-src 'self'`
+with no `'unsafe-eval'`; and no stored value should be interpolated into source
+code in the first place. A preload runs in an isolated world Electron installs
+before the document loads, so the document's policy does not gate it, and the
+answer travels over IPC, which is not a CSP-governed fetch. The migration therefore
+behaves the same whichever side of that question Chromium falls on.
+
+The preload is sandboxed and imports **types only** (a sandboxed preload cannot
+`require` a relative module), so the two short loops that touch storage live in it
+and are executed against a real `localStorage` in the tests, while every decision
+about what moves stays in `services/storageMigration.ts`.
+
+### When an attempt counts as finished
+
+`decideMigration()` is the only place that answers this, and `main.ts` writes the
+marker `storage-migration-v1.done` solely when it says so:
+
+| Case | Marker | Next launch |
+| --- | --- | --- |
+| Both probes answered, keys were copied | written | skipped |
+| Both probes answered, nothing to copy | **written** | skipped |
+| Either probe timed out, threw, or reported an error | not written | retried |
+| The copy never confirmed | not written | retried — safe, because a key is only ever written where it is absent |
+
+The second row is the normal case for every install of the first release, since no
+distributed build ever used the `file://` origin, and it is the row that was wrong:
+an early `return` on the empty plan skipped the marker, so **every** launch rebuilt
+a hidden window and re-read both origins before the overlay could appear. Found in
+review of PR #1. The per-launch cost is **estimated, not measured** — there is no
+Electron runtime in this environment — but it was paid on every launch forever, and
+it was the exact opposite of what the row below claimed.
 
 **The one assumption that could not be verified:** reading the legacy data relies
 on Chromium keying `file://` `localStorage` to the scheme rather than to the full
@@ -91,10 +131,27 @@ hash or nonce. Fonts are `'self'` only, because they are bundled.
 Development is deliberately laxer (Vite injects an inline react-refresh preamble
 and opens an HMR websocket) and a test asserts the difference in both directions.
 
-Two things to check on the first real run, because neither is verifiable here:
-whether the export download (`blob:` URL anchor click) works under the production
-policy, and whether `executeJavaScript` used by the migration probe is unaffected
-by the page CSP (it should be — it is a privileged call, not page script).
+Three things to check on the first real Windows run, because none of them is
+verifiable here:
+
+1. Whether the export download (a `blob:` URL anchor click) works under the
+   production policy.
+2. **Whether `onHeadersReceived` is invoked at all for responses served by
+   `protocol.handle`.** Electron's typings do not say, and the two answers have
+   opposite implications. If it is invoked, the policy above is enforced on
+   `app://crshhx` exactly as intended. If it is not, the policy is inert for the
+   production windows and has to be delivered another way — a
+   `<meta http-equiv="Content-Security-Policy">` in the built HTML is the obvious
+   route, but it must be tried on a real build rather than assumed, because getting
+   it wrong presents as a blank window and nothing else. Check it in DevTools →
+   Network → `index.html` → Response Headers, or by logging inside the listener.
+   The migration no longer depends on this answer: it was the one code path that
+   did, and it now runs through a preload.
+3. Whether the probe preload answered, which the first launch logs:
+   `[crshhx] storage probe answered from <origin> and <origin>`. Two real origins
+   there mean the `app://` document, its preload and the IPC round trip all worked.
+   `undefined` means a probe did not answer; nothing was touched, and the next
+   launch tries again.
 
 ## What ships, and what does not
 
@@ -181,7 +238,7 @@ labelled otherwise.
 | Moved `react`, `react-dom`, `clsx`, `lucide-react`, `tailwind-merge` from dependencies to devDependencies | They are tree-shaken into `dist` by Vite; as runtime dependencies electron-builder copied ~57 MB of source into every install. App payload in the asar is now ≈1.27 MB (dist 958,545 + dist-electron 162,086 + win32-x64 hook 173,116 + manifest). |
 | Pruned uiohook-napi prebuilds for darwin/linux/win-arm64/win-ia32 | ~950 KB per download and install. The module degrades to the accelerator transport if its binary is absent, so a wrong prune costs a feature, not a crash. |
 | Studio window left at Chromium's default throttling | The studio has no work that must continue while a game is in front; an unfocused studio no longer runs timers and compositing at full rate. The overlay keeps `backgroundThrottling: false`, which it genuinely needs. |
-| Storage migration now runs at most once per install, through one reused probe window | First launch unchanged; every later launch skips two hidden windows and two storage probes for the cost of one `stat()`. A failed attempt writes no marker, so it retries. |
+| Storage migration runs at most once per install, through one reused probe window | First launch unchanged; every later launch skips a hidden window and two storage probes for the cost of one `stat()`. A failed attempt writes no marker, so it retries. This row was an **untrue claim** until PR #1's review found the empty-plan path returning before the marker write, so nothing was ever skipped. It holds as of the fix, and `decideMigration()` is now the only place that decides. |
 | Removed 12 unused imports/locals; underscored one unused parameter | The renderer typecheck is now clean with **zero** errors, so CI runs it unfiltered instead of grepping known failures away. |
 
 ### Declined, with reasons
@@ -215,8 +272,28 @@ gates a `package` job that runs `electron-builder --win`, prints measured sizes
 and SHA-256 hashes for the installer and the portable exe, and uploads both.
 
 It exists because that is the only environment where the toolchain downloads
-natively *and* `rcedit` can stamp the executable. Run it with **Actions →
-windows-release → Run workflow**, or push a `v*` tag.
+natively *and* `rcedit` can stamp the executable.
+
+When each job runs:
+
+| Trigger | `quality` | `package` |
+| --- | --- | --- |
+| `pull_request` into `main` | runs | skipped |
+| `push` of a `v*` tag | runs | runs |
+| `workflow_dispatch` (manual) | runs | runs |
+
+A pull request gets the gate and nothing more: the Windows job costs about ten
+minutes of runner time to produce executables nobody installs from a PR. To get
+artifacts, run **Actions → windows-release → Run workflow**, or push a `v*` tag.
+
+The workflow asks for `permissions: contents: read` and nothing else. Checkout
+reads the repository, and `upload-artifact` writes into its own run, which the run
+token already allows; nothing here pushes, releases or publishes.
+
+**One caveat worth knowing before relying on it:** GitHub registers only workflows
+that exist on the default branch, so the manual button and the tag trigger do not
+exist until this file is on `main`. A `pull_request` run uses the copy in the branch
+being merged, which is why the quality gate works before that point.
 
 To build on a Windows machine directly:
 

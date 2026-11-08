@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { resolve } from 'path';
 
 import {
@@ -25,15 +25,21 @@ import { dropWoffFallbacks, fontFallbackPlugin, isFontSourceStylesheet } from '.
 import {
   MIGRATED_STORAGE_KEYS,
   STORAGE_PROBE_PATH,
+  decideMigration,
   describeMigration,
-  dumpScript,
-  injectScript,
+  isMigrationEmpty,
   isStorageProbePath,
   legacyProbeHtml,
   markerContents,
   planMigration,
+  probeData,
+  probeFailure,
+  probeOrigin,
+  probeWrittenKeys,
+  settleProbe,
   shouldRunMigration,
 } from '../electron/services/storageMigration';
+import type { ProbeOutcome, ProbeReply, ProbeRequest } from '../electron/services/storageMigration';
 
 /**
  * Production runtime: the custom renderer origin, the CSP and the storage
@@ -42,8 +48,10 @@ import {
  * None of this can be exercised on Windows from this sandbox, so it is exercised
  * as far as it can be in plain Node and jsdom: the URL → path mapping, the
  * traversal guard, the content types, the policy strings, and — for the
- * migration — the actual scripts, run against a real `localStorage`, which is
- * the only way to prove they behave rather than merely parse.
+ * migration — the real probe preload driven through a stubbed IPC channel against
+ * a real `localStorage`, plus every branch of the decision that writes the
+ * completion marker. Executing the code that ships is the only way to prove it
+ * behaves rather than merely parses.
  */
 
 const ROOT = resolve(__dirname, '..');
@@ -270,10 +278,37 @@ describe('storage migration planning', () => {
 });
 
 /* ------------------------------------------------------------------ *
- * storageMigration — the injected scripts, executed for real
+ * storageMigration — the probe preload, executed for real
  * ------------------------------------------------------------------ */
 
-describe('storage migration scripts', () => {
+/**
+ * The preload is imported once with `electron` stubbed, so the IPC listener it
+ * registers can be driven directly against a real `localStorage`.
+ *
+ * That is the point of moving off `executeJavaScript`: the code that touches
+ * storage is now a module a test can execute, instead of a string that had to be
+ * evaluated to be believed — and whose evaluation the production CSP might refuse
+ * outright.
+ */
+describe('storage migration probe preload', () => {
+  const sent: Array<{ channel: string; payload: ProbeReply }> = [];
+  let listener: ((event: unknown, request: ProbeRequest) => void) | null = null;
+
+  beforeAll(async () => {
+    vi.doMock('electron', () => ({
+      ipcRenderer: {
+        on: (channel: string, fn: (event: unknown, request: ProbeRequest) => void) => {
+          expect(channel).toBe('crshhx-storage-probe');
+          listener = fn;
+        },
+        send: (channel: string, payload: ProbeReply) => {
+          sent.push({ channel, payload });
+        },
+      },
+    }));
+    await import('../electron/probePreload');
+  });
+
   function prime(entries: Record<string, string>, foreign: string[] = ['unrelated_thing']) {
     window.localStorage.clear();
     for (const [key, value] of Object.entries(entries)) {
@@ -282,41 +317,61 @@ describe('storage migration scripts', () => {
     for (const key of foreign) window.localStorage.setItem(key, 'not ours');
   }
 
-  it('dumps exactly our keys out of the origin it runs in', () => {
+  /** Sends one request to the preload and returns the single answer it gave. */
+  function ask(request: Omit<ProbeRequest, 'replyChannel'>, replyChannel = 'reply-1'): ProbeReply {
+    sent.length = 0;
+    if (!listener) throw new Error('the preload never registered its listener');
+    listener(null, { ...request, replyChannel });
+    expect(sent).toHaveLength(1);
+    expect(sent[0].channel).toBe(replyChannel);
+    return sent[0].payload;
+  }
+
+  it('dumps exactly the keys it was asked for, out of the origin it runs in', () => {
     prime({ crshhx_custom_presets: '[{"id":"custom-1"}]', crshhx_theme_accent: '#00e599' });
 
-    const raw: string = eval(dumpScript());
-    const dumped = JSON.parse(raw);
+    const reply = ask({ op: 'dump', keys: MIGRATED_STORAGE_KEYS });
 
-    expect(dumped).toEqual({
+    expect(reply.found).toEqual({
       crshhx_custom_presets: '[{"id":"custom-1"}]',
       crshhx_theme_accent: '#00e599',
     });
     // Foreign keys must not travel across origins.
-    expect(dumped).not.toHaveProperty('unrelated_thing');
+    expect(reply.found).not.toHaveProperty('unrelated_thing');
+    expect(reply.origin).toBe(window.location.origin);
   });
 
-  it('reports an empty object when storage is unreadable', () => {
-    prime({});
+  it('reports an unreadable origin as an error, never as an empty one', () => {
+    prime({ crshhx_preset_library: 'L' });
     const real = Storage.prototype.getItem;
     Storage.prototype.getItem = () => {
       throw new Error('denied');
     };
+    let reply: ProbeReply;
     try {
-      expect(eval(dumpScript())).toBe('{}');
+      reply = ask({ op: 'dump', keys: MIGRATED_STORAGE_KEYS });
     } finally {
       Storage.prototype.getItem = real;
     }
+
+    expect(reply.found).toBeUndefined();
+    expect(reply.error).toMatch(/denied/);
+    // The distinction the marker decision depends on: an origin that cannot be
+    // read is retried, an origin that is genuinely empty completes the migration.
+    expect(probeFailure({ status: 'ok', value: reply })).toMatch(/denied/);
+    expect(probeFailure({ status: 'ok', value: { found: {} } })).toBeNull();
+    expect(probeData({ status: 'ok', value: reply })).toEqual({});
   });
 
-  it('writes only absent keys and reports which ones', () => {
+  it('writes only absent keys and reports which ones it stored', () => {
     prime({ crshhx_app_settings: 'NEWER' });
 
-    const written: string = eval(
-      injectScript({ crshhx_app_settings: 'OLDER', crshhx_preset_library: 'LIB' }),
-    );
+    const reply = ask({
+      op: 'write',
+      entries: { crshhx_app_settings: 'OLDER', crshhx_preset_library: 'LIB' },
+    });
 
-    expect(JSON.parse(written)).toEqual(['crshhx_preset_library']);
+    expect(reply.written).toEqual(['crshhx_preset_library']);
     // The newer value survived untouched.
     expect(window.localStorage.getItem('crshhx_app_settings')).toBe('NEWER');
     expect(window.localStorage.getItem('crshhx_preset_library')).toBe('LIB');
@@ -332,24 +387,246 @@ describe('storage migration scripts', () => {
       big: 'x'.repeat(200_000),
     });
 
-    eval(injectScript({ crshhx_custom_presets: awkward }));
+    ask({ op: 'write', entries: { crshhx_custom_presets: awkward } });
     expect(window.localStorage.getItem('crshhx_custom_presets')).toBe(awkward);
 
-    const back = JSON.parse(eval(dumpScript()));
-    expect(back.crshhx_custom_presets).toBe(awkward);
+    const back = ask({ op: 'dump', keys: MIGRATED_STORAGE_KEYS });
+    expect(back.found?.crshhx_custom_presets).toBe(awkward);
   });
 
-  it('survives a localStorage that refuses writes', () => {
+  it('reports a refused write as a failure instead of claiming it copied nothing', () => {
     prime({});
     const real = Storage.prototype.setItem;
     Storage.prototype.setItem = () => {
       throw new Error('quota');
     };
+    let reply: ProbeReply;
     try {
-      expect(eval(injectScript({ crshhx_preset_library: 'L' }))).toBe('[]');
+      reply = ask({ op: 'write', entries: { crshhx_preset_library: 'L' } });
     } finally {
       Storage.prototype.setItem = real;
     }
+
+    expect(reply.written).toBeUndefined();
+    expect(reply.error).toMatch(/quota/);
+    // The old injected script answered `'[]'` here, which read as "copied nothing,
+    // migration complete" and would have written the marker over a failed copy.
+    expect(probeWrittenKeys({ status: 'ok', value: reply })).toEqual([]);
+    expect(probeFailure({ status: 'ok', value: reply })).toMatch(/quota/);
+    expect(window.localStorage.getItem('crshhx_preset_library')).toBeNull();
+  });
+
+  it('answers an unknown operation with an error rather than silence', () => {
+    prime({});
+    const reply = ask({ op: 'destroy-everything' } as unknown as Omit<ProbeRequest, 'replyChannel'>);
+    expect(reply.error).toMatch(/Unknown probe operation/);
+    expect(probeFailure({ status: 'ok', value: reply })).toBeTruthy();
+  });
+
+  it('ignores a request it has no way to answer', () => {
+    prime({});
+    sent.length = 0;
+    if (!listener) throw new Error('the preload never registered its listener');
+    listener(null, {} as ProbeRequest);
+    expect(sent).toEqual([]);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * storageMigration — whether the attempt finished
+ * ------------------------------------------------------------------ */
+
+/** Probe outcomes, spelled out once so each case below reads as a sentence. */
+const answered = (value: unknown): ProbeOutcome => ({ status: 'ok', value });
+const timedOut: ProbeOutcome = { status: 'timeout', ms: 4000 };
+const threw = (message: string): ProbeOutcome => ({ status: 'error', message });
+
+describe('migration completion', () => {
+  it('writes the marker when keys were copied', () => {
+    const decision = decideMigration({
+      source: answered({ found: { crshhx_preset_library: 'LIB' } }),
+      destination: answered({ found: {} }),
+      plan: planMigration({ crshhx_preset_library: 'LIB' }, {}),
+      write: answered({ written: ['crshhx_preset_library'] }),
+    });
+
+    expect(decision.writeMarker).toBe(true);
+    expect(decision.report).toMatch(/Moved 1 saved item/);
+    expect(decision.report).toMatch(/Wrote 1 key\./);
+    expect(decision.report).toMatch(/Nothing was deleted/);
+  });
+
+  it('writes the marker when both probes answered and there was nothing to copy', () => {
+    // The regression this test exists for. A fresh install has nothing under the
+    // old origin; returning early without a marker made every later launch repeat
+    // the hidden window and both probes, forever.
+    const plan = planMigration({}, {});
+    expect(isMigrationEmpty(plan)).toBe(true);
+
+    const decision = decideMigration({
+      source: answered({ found: {} }),
+      destination: answered({ found: {} }),
+      plan,
+    });
+
+    expect(decision.writeMarker).toBe(true);
+    expect(decision.report).toMatch(/clean library/);
+  });
+
+  it('writes the marker when the current origin already superseded the old one', () => {
+    const decision = decideMigration({
+      source: answered({ found: { crshhx_app_settings: 'OLD' } }),
+      destination: answered({ found: { crshhx_app_settings: 'NEW' } }),
+      plan: planMigration({ crshhx_app_settings: 'OLD' }, { crshhx_app_settings: 'NEW' }),
+    });
+
+    expect(decision.writeMarker).toBe(true);
+    expect(decision.report).toMatch(/already holds your data/);
+  });
+
+  it('does not write the marker when the legacy probe timed out', () => {
+    const decision = decideMigration({
+      source: timedOut,
+      destination: answered({ found: {} }),
+      plan: planMigration({}, {}),
+    });
+
+    expect(decision.writeMarker).toBe(false);
+    expect(decision.report).toMatch(/did not answer within 4000 ms/);
+    expect(decision.report).toMatch(/nothing under the previous storage origin was modified/);
+    expect(decision.report).toMatch(/next launch will try again/);
+  });
+
+  it('does not write the marker when the destination probe threw', () => {
+    const decision = decideMigration({
+      source: answered({ found: { crshhx_preset_library: 'LIB' } }),
+      destination: threw('EvalError: refused by the page policy'),
+      plan: planMigration({ crshhx_preset_library: 'LIB' }, {}),
+    });
+
+    expect(decision.writeMarker).toBe(false);
+    expect(decision.report).toMatch(/current storage origin reported an error/);
+    expect(decision.report).toMatch(/EvalError/);
+  });
+
+  it('does not write the marker when the probe document reported an error', () => {
+    const decision = decideMigration({
+      source: answered({ error: 'denied' }),
+      destination: answered({ found: {} }),
+      plan: planMigration({}, {}),
+    });
+
+    expect(decision.writeMarker).toBe(false);
+    expect(decision.report).toMatch(/probe document reported an error \(denied\)/);
+  });
+
+  it('does not write the marker when the copy never confirmed', () => {
+    const decision = decideMigration({
+      source: answered({ found: { crshhx_preset_library: 'LIB' } }),
+      destination: answered({ found: {} }),
+      plan: planMigration({ crshhx_preset_library: 'LIB' }, {}),
+      write: timedOut,
+    });
+
+    expect(decision.writeMarker).toBe(false);
+    // Retrying is safe and the report has to say so: a partial copy is not a
+    // broken one, because a key is only ever written where it is absent.
+    expect(decision.report).toMatch(/Re-running is safe/);
+    expect(decision.report).toMatch(/next launch will try again/);
+  });
+
+  it('does not write the marker when a non-empty plan was never written', () => {
+    const decision = decideMigration({
+      source: answered({ found: { crshhx_preset_library: 'LIB' } }),
+      destination: answered({ found: {} }),
+      plan: planMigration({ crshhx_preset_library: 'LIB' }, {}),
+    });
+
+    expect(decision.writeMarker).toBe(false);
+    expect(decision.report).toMatch(/never attempted/);
+  });
+
+  it('reports what was actually stored when the destination moved mid-copy', () => {
+    const decision = decideMigration({
+      source: answered({
+        found: { crshhx_preset_library: 'LIB', crshhx_theme_accent: '#fff' },
+      }),
+      destination: answered({ found: {} }),
+      plan: planMigration(
+        { crshhx_preset_library: 'LIB', crshhx_theme_accent: '#fff' },
+        {},
+      ),
+      write: answered({ written: ['crshhx_preset_library'] }),
+    });
+
+    expect(decision.writeMarker).toBe(true);
+    expect(decision.report).toMatch(/Moved 2 saved items/);
+    expect(decision.report).toMatch(/Wrote 1 key\./);
+  });
+});
+
+describe('probe settling', () => {
+  it('keeps a successful answer', async () => {
+    const outcome = await settleProbe(
+      Promise.resolve({ found: { crshhx_theme_accent: '#fff' } }),
+      1000,
+    );
+    expect(outcome.status).toBe('ok');
+    expect(probeData(outcome)).toEqual({ crshhx_theme_accent: '#fff' });
+  });
+
+  it('turns a rejection into an error outcome instead of throwing', async () => {
+    const outcome = await settleProbe(Promise.reject(new Error('window is gone')), 1000);
+    expect(outcome).toEqual({ status: 'error', message: 'window is gone' });
+    expect(probeFailure(outcome)).toMatch(/window is gone/);
+  });
+
+  it('turns a probe that never answers into a timeout', async () => {
+    const outcome = await settleProbe(new Promise(() => {}), 5);
+    expect(outcome).toEqual({ status: 'timeout', ms: 5 });
+  });
+
+  it('does not leave its timer running behind the app startup', async () => {
+    vi.useFakeTimers();
+    try {
+      const baseline = vi.getTimerCount();
+
+      const pending = settleProbe(new Promise(() => {}), 4000);
+      expect(vi.getTimerCount()).toBe(baseline + 1);
+      vi.advanceTimersByTime(4000);
+      expect((await pending).status).toBe('timeout');
+      expect(vi.getTimerCount()).toBe(baseline);
+
+      let release: (value: unknown) => void = () => {};
+      const answeredFirst = settleProbe(
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+        4000,
+      );
+      expect(vi.getTimerCount()).toBe(baseline + 1);
+      release({ found: {} });
+      expect((await answeredFirst).status).toBe('ok');
+      expect(vi.getTimerCount()).toBe(baseline);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('normalises whatever shape arrives over IPC', () => {
+    expect(probeData({ status: 'ok', value: { found: { a: 'x', b: 2, c: null } } })).toEqual({
+      a: 'x',
+    });
+    // A JSON string is accepted too, so the answer survives either serialisation.
+    expect(probeData({ status: 'ok', value: '{"found":{"a":"x"}}' })).toEqual({ a: 'x' });
+    expect(probeData({ status: 'ok', value: null })).toEqual({});
+    expect(probeData({ status: 'ok', value: ['a'] })).toEqual({});
+    expect(probeData({ status: 'ok', value: 'not json' })).toEqual({});
+    expect(probeData(timedOut)).toEqual({});
+    expect(probeWrittenKeys({ status: 'ok', value: { written: ['a', 3] } })).toEqual(['a']);
+    expect(probeWrittenKeys(timedOut)).toEqual([]);
+    expect(probeOrigin({ status: 'ok', value: { origin: 'app://crshhx' } })).toBe('app://crshhx');
+    expect(probeOrigin(threw('x'))).toBeUndefined();
   });
 });
 
@@ -384,6 +661,32 @@ describe('migration runs once per install', () => {
     const parsed = JSON.parse(contents);
     expect(parsed.report).toBe('Moved 3 saved items.');
     expect(parsed.completedAt).toBe(new Date(1_700_000_000_000).toISOString());
+  });
+
+  it('means a fresh install probes once, not once per launch', () => {
+    // The whole chain, for the case almost every install hits: both probes answer,
+    // the old origin is empty, so the attempt is *finished* — the marker is
+    // written with the report it produced, and the next launch skips the probe.
+    const first = decideMigration({
+      source: { status: 'ok', value: { found: {} } },
+      destination: { status: 'ok', value: { found: {} } },
+      plan: planMigration({}, {}),
+    });
+    expect(first.writeMarker).toBe(true);
+
+    const marker = JSON.parse(markerContents(first.report, 1_700_000_000_000));
+    expect(marker.report).toMatch(/clean library/);
+    expect(shouldRunMigration({ isDev: false, markerExists: true })).toBe(false);
+  });
+
+  it('means a failed probe is retried rather than marked complete', () => {
+    const attempt = decideMigration({
+      source: { status: 'timeout', ms: 4000 },
+      destination: { status: 'ok', value: { found: {} } },
+      plan: planMigration({}, {}),
+    });
+    expect(attempt.writeMarker).toBe(false);
+    expect(shouldRunMigration({ isDev: false, markerExists: false })).toBe(true);
   });
 });
 

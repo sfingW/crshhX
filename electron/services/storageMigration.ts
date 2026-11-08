@@ -21,9 +21,10 @@ import { WEAPON_SLOTS_RUNTIME_KEY, WEAPON_SLOTS_STORAGE_KEY } from '../../src/li
  * - Migration never deletes the source. If it goes wrong, the old data is still
  *   sitting under `file://` and can be recovered by hand.
  *
- * The decision logic and the injected scripts are pure so they can be executed
- * against a real `localStorage` in jsdom. The Electron plumbing that drives them
- * (a hidden window on the legacy origin) lives in `main.ts`.
+ * The decision logic is pure so it can be executed against a real `localStorage`
+ * in jsdom. The Electron plumbing that drives it (a hidden window on the legacy
+ * origin) lives in `main.ts`, and the other end of that window's probe lives in
+ * `electron/probePreload.ts`.
  */
 
 /**
@@ -119,11 +120,19 @@ export function describeMigration(plan: MigrationPlan): string {
  * Name of the marker file written into userData once a migration attempt has
  * completed.
  *
- * Without it, every launch pays for two hidden windows and two storage probes
- * even though the work can only ever be needed once. Startup time on a utility
- * that people launch before a game matters; a stat() on one small file does not.
- * The marker is written only when the attempt *completes* — a crash or timeout
- * leaves it absent so the next launch retries rather than silently skipping.
+ * Without it, every launch pays for a hidden window and two storage probes even
+ * though the work can only ever be needed once. Startup time on a utility that
+ * people launch before a game matters; a stat() on one small file does not.
+ *
+ * "Completed" includes **completed with nothing to do**. That case is the common
+ * one — no distributed build ever used the `file://` origin, so almost every
+ * install finds an empty source — and returning early without a marker made
+ * every later launch repeat the whole probe. `decideMigration` is the single
+ * place that distinguishes "finished, mark it" from "failed, retry", so the
+ * marker can only be written on a finished attempt.
+ *
+ * A crash, a timeout or a probe that reports an error leaves the marker absent,
+ * so the next launch retries rather than silently skipping.
  */
 export const MIGRATION_MARKER_NAME = 'storage-migration-v1.done';
 
@@ -141,58 +150,215 @@ export function markerContents(report: string, now: number): string {
 }
 
 /* ------------------------------------------------------------------ *
- * Scripts run inside the hidden windows
+ * The probe protocol
  * ------------------------------------------------------------------ */
 
 /**
- * Reads our keys out of whichever origin this script runs in.
+ * How the hidden window is asked to touch `localStorage`.
  *
- * Returns a JSON string rather than an object so the result crosses
- * `executeJavaScript` as a plain value, with no ambiguity about how Electron
- * chose to serialise it. Any failure yields `'{}'` — a probe that cannot read
- * storage must look like "nothing to migrate", never like a crash.
+ * This replaced two functions that built JavaScript **source** out of stored
+ * strings and handed it to `webContents.executeJavaScript`. Evaluating a script
+ * inside a document has a problem this project cannot test its way around:
+ * whether it runs at all depends on that document's Content Security Policy, and
+ * the production policy is `script-src 'self'` with no `'unsafe-eval'`. A preload
+ * script is not governed by the document's policy — Electron installs it in an
+ * isolated world — and IPC is not a CSP-governed fetch, as
+ * `services/contentSecurity.ts` already notes. So the migration now behaves the
+ * same way whichever side of that question Electron falls on, and no stored value
+ * is ever interpolated into source code.
+ *
+ * `electron/probePreload.ts` implements the other end. It imports these types and
+ * nothing else: a sandboxed preload cannot `require` a relative module, so the two
+ * short loops that read and write storage live there (and are tested there, with a
+ * stubbed `ipcRenderer` and a real `localStorage`), while every decision about
+ * *what* moves, and whether the attempt counts as finished, stays here.
  */
-export function dumpScript(keys: readonly string[] = MIGRATED_STORAGE_KEYS): string {
-  return `(function () {
-  try {
-    var wanted = ${JSON.stringify([...keys])};
-    var found = {};
-    for (var i = 0; i < wanted.length; i++) {
-      var value = window.localStorage.getItem(wanted[i]);
-      if (value !== null) found[wanted[i]] = value;
-    }
-    return JSON.stringify(found);
-  } catch (err) {
-    return '{}';
-  }
-})()`;
+export interface ProbeRequest {
+  /** Where the answer must be sent. Unique per request. */
+  replyChannel: string;
+  op: 'dump' | 'write';
+  /** For `dump`: which keys to read. Always `MIGRATED_STORAGE_KEYS`. */
+  keys?: readonly string[];
+  /** For `write`: entries to store where the key is absent. */
+  entries?: Record<string, string>;
+}
+
+export interface ProbeReply {
+  /** `dump`: the keys that were present. */
+  found?: Record<string, string>;
+  /** `write`: the keys that were actually stored. */
+  written?: string[];
+  /** Where the answer came from. Logged, never trusted for a decision. */
+  origin?: string;
+  /** Set when the probe document could not do what was asked. */
+  error?: string;
 }
 
 /**
- * Writes the migrated entries into the new origin, **only** where the key is
- * absent. The guard is repeated here rather than trusting `planMigration` alone,
- * because the destination can change between planning and injection — the studio
- * window may have already booted and saved something.
+ * What the main process learns from one probe.
+ *
+ * Deliberately a three-way result rather than a value-or-null: "the probe
+ * answered and storage was empty" and "the probe never answered" must not look
+ * the same, because only one of them is allowed to write the marker.
  */
-export function injectScript(entries: Record<string, string>): string {
-  return `(function () {
-  try {
-    var entries = ${JSON.stringify(entries)};
-    var keys = Object.keys(entries);
-    var written = [];
-    for (var i = 0; i < keys.length; i++) {
-      var key = keys[i];
-      if (window.localStorage.getItem(key) === null) {
-        window.localStorage.setItem(key, entries[key]);
-        written.push(key);
-      }
-    }
-    return JSON.stringify(written);
-  } catch (err) {
-    return '[]';
-  }
-})()`;
+export type ProbeOutcome =
+  | { status: 'ok'; value: unknown }
+  | { status: 'timeout'; ms: number }
+  | { status: 'error'; message: string };
+
+/**
+ * Settles a probe into an outcome: a rejection becomes `error`, a probe that
+ * outlives `ms` becomes `timeout`, and the pending timer is cleared instead of
+ * being left running behind the app's startup.
+ */
+export function settleProbe(work: Promise<unknown>, ms: number): Promise<ProbeOutcome> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    work.then(
+      (value): ProbeOutcome => ({ status: 'ok', value }),
+      (err: unknown): ProbeOutcome => ({
+        status: 'error',
+        message: String((err as Error)?.message ?? err),
+      }),
+    ),
+    new Promise<ProbeOutcome>((resolve) => {
+      timer = setTimeout(() => resolve({ status: 'timeout', ms }), ms);
+    }),
+  ]).then((outcome) => {
+    if (timer) clearTimeout(timer);
+    return outcome;
+  });
 }
+
+function tryParseJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function stringRecord(raw: Record<string, unknown>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value === 'string') out[key] = value;
+  }
+  return out;
+}
+
+/**
+ * Normalises whatever came back over IPC into the reply shape.
+ *
+ * Only the expected fields survive, and only string values inside `found`, so a
+ * malformed answer degrades to "nothing reported" rather than reaching the plan.
+ */
+function asProbeReply(raw: unknown): ProbeReply {
+  const value = typeof raw === 'string' ? tryParseJson(raw) : raw;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+
+  const reply = value as Record<string, unknown>;
+  const out: ProbeReply = {};
+  if (reply.found && typeof reply.found === 'object' && !Array.isArray(reply.found)) {
+    out.found = stringRecord(reply.found as Record<string, unknown>);
+  }
+  if (Array.isArray(reply.written)) {
+    out.written = reply.written.filter((key): key is string => typeof key === 'string');
+  }
+  if (typeof reply.origin === 'string') out.origin = reply.origin;
+  if (typeof reply.error === 'string') out.error = reply.error;
+  return out;
+}
+
+/** The keys the probe found. Anything but a successful answer reads as none. */
+export function probeData(outcome: ProbeOutcome): Record<string, string> {
+  return outcome.status === 'ok' ? asProbeReply(outcome.value).found ?? {} : {};
+}
+
+/** The keys the probe stored. Anything but a successful answer reads as none. */
+export function probeWrittenKeys(outcome: ProbeOutcome): string[] {
+  return outcome.status === 'ok' ? asProbeReply(outcome.value).written ?? [] : [];
+}
+
+/** Where the answer came from, for the log line. */
+export function probeOrigin(outcome: ProbeOutcome): string | undefined {
+  return outcome.status === 'ok' ? asProbeReply(outcome.value).origin : undefined;
+}
+
+/** Why a probe cannot be acted on, or `null` when it can. */
+export function probeFailure(outcome: ProbeOutcome): string | null {
+  if (outcome.status === 'timeout') return `did not answer within ${outcome.ms} ms`;
+  if (outcome.status === 'error') return `reported an error (${outcome.message})`;
+  const error = asProbeReply(outcome.value).error;
+  return error ? `the probe document reported an error (${error})` : null;
+}
+
+/* ------------------------------------------------------------------ *
+ * Whether the attempt counts as finished
+ * ------------------------------------------------------------------ */
+
+export interface MigrationDecision {
+  /** True only when the attempt finished, so the marker may be written. */
+  writeMarker: boolean;
+  /** One honest line: the marker's report when finished, the reason when not. */
+  report: string;
+}
+
+const RETRY_NOTE =
+  'nothing under the previous storage origin was modified or deleted, and the next launch will try again.';
+
+function notCompleted(reason: string): MigrationDecision {
+  return { writeMarker: false, report: `Migration did not complete: ${reason}; ${RETRY_NOTE}` };
+}
+
+/**
+ * The single decision point for the marker.
+ *
+ * Three cases matter, and only the middle one used to be wrong:
+ *
+ * 1. both probes answered and keys were copied  -> finished, write the marker;
+ * 2. both probes answered and nothing needed to move -> **also finished**;
+ * 3. either probe timed out, threw, or reported an error -> not finished, no
+ *    marker, retry on the next launch.
+ *
+ * Case 2 is the normal one for every install of the first release, so getting it
+ * wrong meant paying for a hidden window and two probes on every launch forever.
+ */
+export function decideMigration(context: {
+  source: ProbeOutcome;
+  destination: ProbeOutcome;
+  plan: MigrationPlan;
+  /** Present only when the plan had something to copy. */
+  write?: ProbeOutcome;
+}): MigrationDecision {
+  const sourceFailure = probeFailure(context.source);
+  if (sourceFailure) return notCompleted(`the previous storage origin ${sourceFailure}`);
+
+  const destinationFailure = probeFailure(context.destination);
+  if (destinationFailure) return notCompleted(`the current storage origin ${destinationFailure}`);
+
+  if (isMigrationEmpty(context.plan)) {
+    return { writeMarker: true, report: describeMigration(context.plan) };
+  }
+
+  if (!context.write) return notCompleted('the copy was never attempted');
+
+  const writeFailure = probeFailure(context.write);
+  if (writeFailure) {
+    return {
+      writeMarker: false,
+      report:
+        `Migration did not complete: the copy into the current storage origin ${writeFailure}. ` +
+        `Re-running is safe, because a key is only ever written where it is absent; ${RETRY_NOTE}`,
+    };
+  }
+
+  const written = probeWrittenKeys(context.write);
+  return {
+    writeMarker: true,
+    report: `${describeMigration(context.plan)} Wrote ${written.length} key${written.length === 1 ? '' : 's'}.`,
+  };
+}
+
 
 /**
  * The document loaded on the legacy `file://` origin purely to read its storage.

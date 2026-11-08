@@ -17,17 +17,21 @@ import {
 } from './services/rendererAssets';
 import { CSP_HEADER, contentSecurityPolicy } from './services/contentSecurity';
 import {
+  MIGRATED_STORAGE_KEYS,
   MIGRATION_MARKER_NAME,
   STORAGE_PROBE_PATH,
-  describeMigration,
+  decideMigration,
+  isMigrationEmpty,
   isStorageProbePath,
-  markerContents,
-  shouldRunMigration,
-  dumpScript,
-  injectScript,
   legacyProbeHtml,
+  markerContents,
   planMigration,
+  probeData,
+  probeOrigin,
+  settleProbe,
+  shouldRunMigration,
 } from './services/storageMigration';
+import type { ProbeOutcome, ProbeRequest } from './services/storageMigration';
 
 /*
  * Scheme privileges must be declared before `app` is ready — Electron silently
@@ -65,31 +69,9 @@ let currentConfig: any = null;
 const isDev = process.env.NODE_ENV === 'development';
 const DEV_SERVER_URL = 'http://localhost:5173';
 
-/** Everything the migration and protocol handlers give up after this long. A
+/** How long one storage probe may take before the migration gives up on it. A
  *  slow probe must delay startup by a bounded amount, never hang it. */
 const MIGRATION_TIMEOUT_MS = 4000;
-
-function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
-  ]);
-}
-
-function parseJsonObject(raw: unknown): Record<string, string> {
-  if (typeof raw !== 'string') return {};
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-    const out: Record<string, string> = {};
-    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
-      if (typeof value === 'string') out[key] = value;
-    }
-    return out;
-  } catch {
-    return {};
-  }
-}
 
 function send(channel: string, window: BrowserWindow | null, payload?: unknown) {
   if (window && !window.isDestroyed() && !window.webContents.isDestroyed()) {
@@ -332,19 +314,62 @@ function registerContentSecurityPolicy() {
 /**
  * One hidden window, reused across origins.
  *
- * It exists only to touch `localStorage`, so it gets no preload and a sandbox.
- * Navigating the same window from the legacy `file://` origin to `app://crshhx`
- * is what makes a single window enough: each origin's storage is read while the
- * document is on that origin.
+ * It exists only to touch `localStorage`. Navigating the same window from the
+ * legacy `file://` origin to `app://crshhx` is what makes a single window enough:
+ * each origin's storage is read while the document is on that origin.
+ *
+ * It gets a **preload** rather than an injected script, because a string handed to
+ * `executeJavaScript` is evaluated inside the document, and the production policy
+ * is `script-src 'self'` with no `'unsafe-eval'` — see `electron/probePreload.ts`
+ * for why that made the migration's success untestable. It stays sandboxed and
+ * without node integration: the preload needs nothing more, and neither document
+ * it loads runs any code of its own.
  */
 function createProbeWindow(): BrowserWindow {
   return new BrowserWindow({
     show: false,
     webPreferences: {
+      preload: path.join(__dirname, 'probePreload.js'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
     },
+  });
+}
+
+/**
+ * Channel the probe preload listens on. The same literal is declared in that file;
+ * it cannot be imported in either direction, and `tests/buildLayout.test.ts` pins
+ * the two together.
+ */
+const PROBE_CHANNEL = 'crshhx-storage-probe';
+
+let probeRequests = 0;
+
+/**
+ * Asks the probe document to read or write storage, and settles the answer.
+ *
+ * The reply channel is unique per request, so an answer can never be matched to
+ * the wrong question, and the listener is removed whatever happens: a probe that
+ * times out must not leave a listener behind that a later probe could answer.
+ */
+function probeRequest(
+  window: BrowserWindow,
+  request: Omit<ProbeRequest, 'replyChannel'>,
+): Promise<ProbeOutcome> {
+  const replyChannel = `${PROBE_CHANNEL}:reply-${++probeRequests}`;
+  return settleProbe(
+    new Promise<unknown>((resolve, reject) => {
+      ipcMain.once(replyChannel, (_event, value: unknown) => resolve(value));
+      try {
+        window.webContents.send(PROBE_CHANNEL, { ...request, replyChannel });
+      } catch (err) {
+        reject(err);
+      }
+    }),
+    MIGRATION_TIMEOUT_MS,
+  ).finally(() => {
+    ipcMain.removeAllListeners(replyChannel);
   });
 }
 
@@ -354,6 +379,12 @@ function createProbeWindow(): BrowserWindow {
  * Runs before any application window is created, and never throws: a migration
  * that fails must degrade to "start clean", not to "crash on launch". It also
  * never deletes the source, so a failed migration is recoverable by hand.
+ *
+ * Whether the attempt *finished* — and so whether the marker is written and the
+ * next launch can skip all of this — is decided in exactly one place,
+ * `decideMigration`, so "both probes answered and there was nothing to move"
+ * cannot be mistaken for "a probe failed". Confusing those two is what made every
+ * launch repeat this function.
  */
 async function migrateStorageOrigin(): Promise<string> {
   const markerPath = path.join(app.getPath('userData'), MIGRATION_MARKER_NAME);
@@ -367,41 +398,42 @@ async function migrateStorageOrigin(): Promise<string> {
   let probe: BrowserWindow | null = null;
   try {
     probe = createProbeWindow();
+
     // 1. Read the legacy file:// origin. localStorage there is shared across
     //    file:// pages, so any file on disk will do; it is written to temp
     //    rather than shipped, so it is not reachable through app://.
     writeFileSync(probePath, legacyProbeHtml(), 'utf8');
-    const run = (url: string, script: string) =>
-      withTimeout(probe!.webContents.loadURL(url).then(() =>
-        probe!.webContents.executeJavaScript(script, true),
-      ), MIGRATION_TIMEOUT_MS, null);
+    await probe.webContents.loadURL(pathToFileURL(probePath).toString());
+    const source = await probeRequest(probe, { op: 'dump', keys: MIGRATED_STORAGE_KEYS });
 
-    const rawSource = await run(pathToFileURL(probePath).toString(), dumpScript());
-    const source = parseJsonObject(rawSource);
+    // 2. Read the destination origin, so nothing newer is overwritten. This
+    //    document is served from memory by the app:// handler and runs no
+    //    application code, which is what keeps the studio's first-run defaults
+    //    out of the keys this migration is about to fill.
+    await probe.webContents.loadURL(`${APP_ORIGIN}${STORAGE_PROBE_PATH}`);
+    const destination = await probeRequest(probe, { op: 'dump', keys: MIGRATED_STORAGE_KEYS });
 
-    // 2. Read the destination origin, so nothing newer is overwritten.
-    const rawDestination = await run(`${APP_ORIGIN}${STORAGE_PROBE_PATH}`, dumpScript());
-    const destination = parseJsonObject(rawDestination);
+    // This runs at most once per install, so the two origins it heard from are
+    // worth a line: on a real machine it is the evidence that the app:// document
+    // and its preload worked at all.
+    console.log(
+      `[crshhx] storage probe answered from ${String(probeOrigin(source))} and ${String(probeOrigin(destination))}`,
+    );
 
-    const plan = planMigration(source, destination);
-    if (Object.keys(plan.toCopy).length === 0) return describeMigration(plan);
+    const plan = planMigration(probeData(source), probeData(destination));
 
-    // 3. Write. The script re-checks each key, because the destination could
-    //    have changed while the probes were open.
-    const rawWritten = await run(`${APP_ORIGIN}${STORAGE_PROBE_PATH}`, injectScript(plan.toCopy));
-    const written = parseJsonObject({ written: String(rawWritten ?? '[]') }).written;
-    const count = (() => {
-      try {
-        const parsed: unknown = JSON.parse(written ?? '[]');
-        return Array.isArray(parsed) ? parsed.length : 0;
-      } catch {
-        return 0;
-      }
-    })();
+    // 3. Write, only if there is something to move. The window is already on the
+    //    destination origin, and the preload re-checks each key before storing it,
+    //    because the destination could have changed since it was read.
+    const write = isMigrationEmpty(plan)
+      ? undefined
+      : await probeRequest(probe, { op: 'write', entries: plan.toCopy });
 
-    const report = `${describeMigration(plan)} Wrote ${count} key${count === 1 ? '' : 's'}.`;
-    writeFileSync(markerPath, markerContents(report, Date.now()), 'utf8');
-    return report;
+    const decision = decideMigration({ source, destination, plan, write });
+    if (decision.writeMarker) {
+      writeFileSync(markerPath, markerContents(decision.report, Date.now()), 'utf8');
+    }
+    return decision.report;
   } catch (err) {
     // Deliberately not fatal, and deliberately no marker: the next launch
     // retries instead of silently skipping a migration that never finished.
