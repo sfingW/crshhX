@@ -1,0 +1,97 @@
+name: Attach release assets
+
+# When a GitHub Release is published, find the windows-release run that
+# packaged that tag, download its artifact and attach the two executables to
+# the release.
+#
+# Why this exists: GitHub's artifact and release-asset CDNs are unreachable
+# from the development sandbox, and its token cannot dispatch workflows, so
+# the bytes can only travel inside GitHub's own network. Assets are therefore
+# always exactly what the packaging run produced and hashed — never rebuilt,
+# never the artifact zip, never uploaded by hand.
+#
+# Guards: the packaging run must have succeeded for this tag, the release must
+# not already carry assets (attach exactly once, never duplicate or
+# overwrite), and the artifact must contain exactly the two expected
+# executables. Sizes and SHA-256 are printed to this run's log before upload.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-assets-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  attach:
+    name: Upload executables to the release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve the packaging run for ${{ github.event.release.tag_name }}
+        id: packaging
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          RUN_ID=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow windows-release.yml \
+            --event push --branch "$TAG" --status success --limit 1 \
+            --json databaseId --jq '.[0].databaseId // ""')
+          if [ -z "$RUN_ID" ]; then
+            echo "No successful windows-release packaging run found for $TAG." >&2
+            exit 1
+          fi
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "Packaging run for $TAG: $RUN_ID"
+
+      - name: Download the packaged executables
+        uses: actions/download-artifact@v4
+        with:
+          name: crshhx-windows-${{ github.event.release.tag_name }}
+          run-id: ${{ steps.packaging.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: artifacts
+
+      - name: Verify and attach
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          VERSION="${TAG#v}"
+          SETUP="crshhx-crosshair-studio-setup-${VERSION}.exe"
+          PORTABLE="crshhx-crosshair-studio-portable-${VERSION}.exe"
+
+          # Attach exactly once: a release that already carries assets stops
+          # the job rather than duplicating or overwriting anything.
+          EXISTING=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --json assets --jq '.assets | length')
+          if [ "$EXISTING" != "0" ]; then
+            echo "Release $TAG already carries $EXISTING asset(s); refusing to duplicate." >&2
+            exit 1
+          fi
+
+          test -f "artifacts/$SETUP"
+          test -f "artifacts/$PORTABLE"
+          FILE_COUNT=$(find artifacts -maxdepth 1 -type f | wc -l)
+          if [ "$FILE_COUNT" -ne 2 ]; then
+            echo "Expected exactly 2 executables, found $FILE_COUNT." >&2
+            exit 1
+          fi
+
+          # Measured figures, printed so they can be quoted from this log and
+          # cross-checked against the release asset metadata GitHub reports.
+          ls -l artifacts
+          sha256sum "artifacts/$SETUP" "artifacts/$PORTABLE"
+
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" \
+            "artifacts/$SETUP" "artifacts/$PORTABLE"
+
+          echo "Attached both executables to $TAG."
