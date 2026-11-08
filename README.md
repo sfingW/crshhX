@@ -8,14 +8,14 @@
 
 | Feature | Crosshair X | **Crshhx** |
 | :--- | :--- | :--- |
-| **Price** | $9.99 on Steam | **100% Free & Open Source** |
+| **Price** | Paid, one-time purchase | **Free to use** |
 | **System Footprint** | Heavy (~150-250MB RAM, CPU polling) | **Ultra-lightweight (<30MB RAM, 0% CPU in HUD mode)** |
 | **Stretched Res (4:3)** | Stretches into ovals & oblong gaps | **Mathematical Counter-Stretch Matrix (circles stay round)** |
 | **Valorant Code Bridge**| ❌ Manual slider tweaking | **✅ Direct 1-Click Valorant Share Code Import/Export** |
 | **CS2 Console Bridge**  | ❌ Manual slider tweaking | **✅ Direct 1-Click CS2 `cl_crosshair*` Console Export** |
 | **Recoil Bloom**        | Basic | **✅ Configurable Firing Expansion Bloom & Recovery Decay** |
 | **ADS Morphing**        | Clunky | **✅ Automatic Right-Click ADS Precision Morph / Dot Swap** |
-| **Ban Safety**          | Safe | **100% Ban Safe (Zero-injection OS Hardware Overlay)** |
+| **Game interaction**    | Overlay only | **Overlay only**; weapon-slot switching adds an optional, never-injecting global input hook |
 
 ---
 
@@ -34,10 +34,28 @@ npm run build
 ```
 
 ### 3. Launch App
+`npm start` runs the packaged-style path: the studio and the HUD overlay load from
+the built `dist/` through a custom `app://crshhx` origin (never `file://`), so
+module scripts and saved data behave the same in development and in an installed
+copy.
 Launch the standalone desktop application:
 ```bash
 npm start
 ```
+
+---
+
+### 4. Package for Windows
+
+```bash
+npm run dist:win
+```
+
+Produces an NSIS installer and a portable executable in `release/`. Fonts are
+bundled, so the installed app renders identically with no internet connection.
+Nothing has been verified on a real Windows machine yet — see
+[`docs/packaging.md`](docs/packaging.md) and the checklist in
+[`docs/testing.md`](docs/testing.md) before trusting a build.
 
 ---
 
@@ -136,6 +154,7 @@ If you play CS2 or Fortnite at **4:3 stretched** (e.g., `1280x960` or `1440x1080
 | [`docs/weapon-slot-crosshairs.md`](docs/weapon-slot-crosshairs.md) | User guide: enabling, assigning keys, choosing crosshairs, profiles, unassigned-slot behaviour, supported inputs, limitations, troubleshooting. |
 | [`docs/architecture.md`](docs/architecture.md) | Module map, data flow, IPC surface, storage schema, migration, and how each prohibited behaviour is prevented. |
 | [`docs/preset-system.md`](docs/preset-system.md) | Crosshair schema v2, the measured ranges of the shipped library, the preset-organisation sidecar, the import/export file format, the editor, and the invariants that keep a library from being lost. |
+| [`docs/packaging.md`](docs/packaging.md) | Turning the repository into an installable Windows app: the custom renderer origin, the storage migration, the CSP, what ships in the installer, and the input-hook question as a separate investigation. |
 | [`docs/testing.md`](docs/testing.md) | How to run the suite, what each file covers, bugs the tests caught, and the **manual Windows verification checklist**. |
 
 ### Tests
@@ -144,7 +163,7 @@ If you play CS2 or Fortnite at **4:3 stretched** (e.g., `1280x960` or `1440x1080
 npm test
 ```
 
-**980 tests across 19 files, all passing.** They cover the switching policy, key-repeat
+**1024 tests across 20 files, all passing.** They cover the switching policy, key-repeat
 guard, binding rules, slot/profile configuration, preset resolution, persistence and
 migration, end-to-end integration through the real service, the React UI in jsdom, and
 build-layout integrity — plus the crosshair schema, colour utilities, config diffing,
@@ -159,11 +178,23 @@ listed in [`docs/testing.md`](docs/testing.md).
 > display server. `docs/testing.md` lists every unverified item and provides a
 > step-by-step checklist to run on a real Windows machine.
 
----
+## 🛡️ What crshhx does and does not do to your game
 
-## 🛡️ Anti-Cheat & Ban Safety Guarantee
-Crshhx uses **zero code injection**:
-- Does **NOT** inject DLLs into game processes.
-- Does **NOT** hook DirectX, Vulkan, or OpenGL rendering pipelines.
-- Does **NOT** touch game memory or binaries.
-- Renders strictly as an OS desktop HUD window above the game window, making it completely invisible to and compliant with **Riot Vanguard, Easy Anti-Cheat, BattlEye, and Valve Anti-Cheat (VAC)**.
+Crshhx draws a crosshair as a **separate desktop window** above the game. It does
+**not** inject DLLs into game processes, does **not** hook DirectX, Vulkan or
+OpenGL, and does **not** read or write game memory or files. That is the whole of
+the safety argument for the overlay itself, and it is the same approach every
+monitor's built-in crosshair uses.
+
+Two things are stated plainly because they matter and are often glossed over:
+
+- **Weapon-slot switching observes your keyboard through a global OS input hook**
+  (optional, and never used to inject or replay input — the game receives every
+  press). A global hook is a mechanism some anti-cheat systems look at closely.
+  If you would rather not run one, leave the feature off and the hook is never
+  loaded; the overlay and editor work without it.
+- **No compatibility with any specific anti-cheat is claimed or guaranteed.**
+  Vanguard, VAC, EAC and BattlEye are third-party systems that change without
+  notice, and nobody outside their vendors can promise how they will treat any
+  overlay or hook. Crshhx has not been certified by anyone, and this README will
+  not pretend otherwise. Decide for yourself, per game, whether to run it.

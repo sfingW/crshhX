@@ -1,0 +1,78 @@
+# Packaging configuration for Crshhx Crosshair Studio.
+#
+# Windows-only for now: the overlay, the foreground-profile feature and the
+# passive input hook are all written against Windows behaviour, and nothing has
+# been validated anywhere else. Do not add a target that has never been run.
+#
+# See docs/packaging.md for what each block protects and what has NOT been
+# verified.
+
+appId: com.crshhx.studio
+productName: Crshhx Crosshair Studio
+
+directories:
+  output: release
+  buildResources: build
+
+# Only what the packaged app actually loads. `src/`, `tests/`, `docs/` and the
+# scratch directory are development-only and must not ship — they would inflate
+# the installer and put source in front of every user.
+files:
+  - dist/**
+  - dist-electron/**
+  - package.json
+  - '!**/*.map'
+  - '!**/__tests__/**'
+
+# Production node_modules are added by electron-builder automatically; the only
+# one this app requires at runtime is uiohook-napi (see below).
+asar: true
+
+# Native modules cannot be loaded from inside an asar archive — the OS loader
+# needs a real file on disk. uiohook-napi ships prebuilt N-API binaries in its
+# npm tarball, so it is unpacked rather than rebuilt.
+asarUnpack:
+  - '**/node_modules/uiohook-napi/**'
+  - '**/*.node'
+
+# uiohook-napi's prebuilds are N-API and load under Electron's ABI unchanged.
+# Rebuilding it from source needs a C toolchain and, on Linux, libX11 headers —
+# neither of which a packaging box should require. Pinned by a test.
+npmRebuild: false
+
+win:
+  icon: build/icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+
+nsis:
+  # A guided installer rather than a silent one-click: the user chooses where it
+  # goes, which matters because the app stores data OUTSIDE the install directory
+  # (see electron/main.ts) and people need to understand that.
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Crshhx Crosshair Studio
+  # Uninstalling the application must not destroy the user's crosshair library,
+  # folders, settings and weapon-slot profiles, which live under the roaming
+  # application-data directory. This is false by default and is pinned by a test
+  # so it can never quietly become true.
+  deleteAppDataOnUninstall: false
+
+portable:
+  # A single self-extracting executable. User data still lives in the roaming
+  # application-data directory (electron/main.ts pins this), so the exe can be
+  # moved between folders or machines and keep its library — which is the whole
+  # point of choosing a portable target.
+  artifactName: crshhx-crosshair-studio-portable-${version}.exe
+
+# No auto-update backend exists. Publishing is deliberately switched off so a
+# release build can never attempt to phone home or half-upload artifacts.
+publish: null

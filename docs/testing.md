@@ -25,7 +25,7 @@ npm run build            # vite build (renderer) + tsc (main process)
 
 ## Current results
 
-**980 tests, 19 files, all passing** (`Test Files 19 passed (19)`, `Tests 980 passed (980)`).
+**1024 tests, 20 files, all passing** (`Test Files 20 passed (20)`, `Tests 1024 passed (1024)`).
 Run on Linux (x64), Node 20, in a sandbox without an Electron binary and without a display
 server. Nothing was skipped. One test was deliberately **rewritten** — `exportPresets` used
 to be asserted to normalise values on the way out, and that behaviour was reversed for a
@@ -43,7 +43,8 @@ No other existing test was removed or weakened.
 | `weaponSlots.persistence.test.ts` | 49 | Serialisation, migration, normalisation idempotency, existing-keys preservation |
 | `weaponSlots.integration.test.ts` | 75 | End-to-end through the real service: transport → policy → overlay channel → status |
 | `weaponSlots.ui.test.tsx` | 152 | Real React components in jsdom: table, recorder, picker, **profile bar / game associations**, indicator, Keybinds page, IPC-robustness, write-isolation |
-| `buildLayout.test.ts` | 14 | Build-layout integrity, native-dependency safety |
+| `buildLayout.test.ts` | 27 | Build-layout integrity, production renderer loading, packaging configuration guards, storage-key completeness, native-dependency safety |
+| `productionRuntime.test.ts` | 31 | The `app://crshhx` asset resolver and its traversal guard, content types, the CSP in both modes, and the storage-migration scripts **executed against a real localStorage** |
 | `crosshairSchema.test.ts` | 45 | Schema v2 normalisation, idempotency, clamping and repairs, arm geometry, rotation/scale resolution, tolerance of junk input |
 | `colorUtils.test.ts` | 58 | Colour parsing and canonicalisation, contrast ratios and verdicts, readable text colour, compositing, colour naming, swatch push |
 | `configDiff.test.ts` | 15 | A/B difference rows, grouping, ignored identity fields, asymmetric-vs-symmetric equivalence |
@@ -275,6 +276,39 @@ No other existing test was removed or weakened.
   **blocked until explicitly acknowledged**.
 - A parse error shows "nothing was changed" and offers no import button at all.
 
+### Production runtime and packaging
+
+- The URL → path resolver serves the studio at the bare origin, maps every asset to
+  its correct content type, strips query strings, and labels unknown extensions as
+  octet-stream rather than guessing.
+- The traversal guard. Plain `..` walks are collapsed by the URL parser before the
+  handler ever sees them, so the test pins what the guard *actually* defends
+  against: **percent-encoded** traversal, plus NUL bytes and bad percent-encoding.
+  Other schemes and other hosts are refused rather than guessed at.
+- Both renderer layouts resolve to the real Vite output: packaged
+  (`appPath/dist`) and unpackaged (`dist-electron/electron` → `../../dist`), so
+  the relationship defect #9 got wrong once cannot quietly return.
+- The production CSP forbids inline and evaluated script, and a helper asserts
+  that property so loosening `script-src` later fails loudly. The same helper
+  asserts development *is* laxer, so nobody "fixes" Vite by tightening dev.
+- `style-src 'unsafe-inline'` is asserted with a comment, because it looks like a
+  weakness and is in fact required by React inline style attributes.
+- The storage-migration scripts are **run**, not just parsed: `dumpScript` against
+  a primed `localStorage` returns exactly crshhx's keys and no foreign ones;
+  `injectScript` writes only absent keys and reports which; both degrade to
+  `{}` / `[]` when storage throws. A 200 KB value containing quotes, newlines and
+  a literal `</script>` round-trips intact.
+- Planning rules: copy only what the destination lacks, never overwrite, no-op for
+  a fresh install, and `crshhx_theme_accent` — the key most likely to be forgotten
+  — is pinned by name.
+- Packaging guards read `electron-builder.yml` as data: both Windows targets and
+  no unverified platform, `asarUnpack` for the native hook, `npmRebuild: false`,
+  `deleteAppDataOnUninstall: false`, `publish: null`, a real `.ico` with the ICO
+  magic number, and the metadata the installer requires.
+- The migrated-key list is re-derived by walking every `.ts`/`.tsx` under `src/`
+  and `electron/` and comparing to `MIGRATED_STORAGE_KEYS`, so a newly persisted
+  key cannot be added without also being migrated.
+
 ---
 
 ## Bugs found by the tests
@@ -357,6 +391,12 @@ tested, but unverified on real hardware**. Do not treat any of it as confirmed w
 | `pickAndReadTextFile` cancel handling on a real OS file dialog | Medium — cancellation is detected with a `window` focus fallback, which is a heuristic and may resolve `null` late or not at all on some platforms | No OS dialog |
 | Reading a genuinely large export (near the 8 MiB ceiling) | Low — size is checked before parsing, but main-thread blocking during parse is unmeasured | No large real-world file |
 | The favourites migration on a **real** user profile with an existing `crshhx_favorites` list | Medium — exercised with fixtures written directly to `localStorage`, not with a profile produced by an older build | No pre-existing user data |
+| **The packaged application has never been launched** — no `.exe`, no installer, not even an unpacked app directory | **High** — everything in the packaging phase is configuration plus unit tests | The sandbox can reach `github.com` but not the release-asset CDN that serves the NSIS and code-sign toolchains; 36 consecutive download attempts failed |
+| The `app://crshhx` protocol handler executing inside Electron (`protocol.handle`, `net.fetch` through the asar, the `fs` fallback) | **High** — the resolver logic is unit tested against the real built bundle, but the Electron wiring has never run | No Electron binary in the sandbox |
+| The storage migration running against a genuine `file://` profile | **High** — rests on Chromium keying `file://` localStorage to the scheme rather than the full path; if wrong it degrades to a fresh install rather than to data loss | Cannot launch Electron here |
+| The Content Security Policy as observed by a real renderer, including whether the export download (`blob:` anchor) and the migration's `executeJavaScript` behave as expected under it | Medium | No Electron binary |
+| Executable icon and version stamping (`rcedit`) | Low — a Linux-built Windows target cannot run it; the installer chrome still carries the icon | Requires Windows or Wine |
+| The NSIS installer and the portable exe actually installing, launching, and keeping data after the portable exe is moved | **High** — the whole point of the packaging work | Artifacts could not be produced here |
 
 ### Pre-existing condition of the repository
 

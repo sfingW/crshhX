@@ -16,7 +16,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "typecheck:main": "tsc -p tsconfig.node.json --noEmit"
+    "typecheck:main": "tsc -p tsconfig.node.json --noEmit",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -26,6 +29,8 @@
     "tailwind-merge": "^3.0.2"
   },
   "devDependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.8",
@@ -37,6 +42,7 @@
     "concurrently": "^9.1.2",
     "cross-env": "^7.0.3",
     "electron": "^34.2.0",
+    "electron-builder": "^26.18.0",
     "jsdom": "^25.0.1",
     "postcss": "^8.5.1",
     "tailwindcss": "^3.4.17",
@@ -46,5 +52,15 @@
   },
   "optionalDependencies": {
     "uiohook-napi": "^1.5.5"
-  }
+  },
+  "author": {
+    "name": "sfingW",
+    "url": "https://github.com/sfingW/crshhX"
+  },
+  "homepage": "https://github.com/sfingW/crshhX",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sfingW/crshhX.git"
+  },
+  "license": "UNLICENSED"
 }

@@ -1,16 +1,57 @@
-import { app, BrowserWindow, ipcMain, globalShortcut, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, globalShortcut, net, protocol, screen, session } from 'electron';
 import * as path from 'path';
+import { pathToFileURL } from 'url';
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { WeaponSlotSwitchService } from './services/weaponSlotService';
 import type { WeaponSlotsRuntime } from '../src/lib/weaponSlots/types';
+import {
+  APP_HOST,
+  APP_ORIGIN,
+  APP_SCHEME,
+  APP_SCHEME_PRIVILEGES,
+  OVERLAY_URL,
+  STUDIO_URL,
+  contentTypeFor,
+  resolveAssetPath,
+  resolveRendererDist,
+} from './services/rendererAssets';
+import { CSP_HEADER, contentSecurityPolicy } from './services/contentSecurity';
+import {
+  STORAGE_PROBE_PATH,
+  describeMigration,
+  isStorageProbePath,
+  dumpScript,
+  injectScript,
+  legacyProbeHtml,
+  planMigration,
+} from './services/storageMigration';
 
-/**
- * Location of the Vite renderer bundle.
- *
- * After compilation this file lives at `dist-electron/electron/main.js`, so the
- * renderer output at `<repo>/dist` is two levels up. Deriving it once here keeps
- * the production `loadFile` paths correct if the build layout ever moves again.
+/*
+ * Scheme privileges must be declared before `app` is ready — Electron silently
+ * ignores the call afterwards, and the failure looks like a blank window rather
+ * than an error. See services/rendererAssets.ts for why the production renderer
+ * is served from `app://crshhx` instead of `file://`.
  */
-const RENDERER_DIST = path.join(__dirname, '..', '..', 'dist');
+protocol.registerSchemesAsPrivileged([
+  { scheme: APP_SCHEME, privileges: { ...APP_SCHEME_PRIVILEGES } },
+]);
+
+/*
+ * User data lives under the roaming application-data directory, keyed by app
+ * name — never under the install directory and never derived from the executable
+ * path. This is what makes a portable exe keep its crosshair library after being
+ * moved to another folder or drive, and what stops an update to a new install
+ * path from orphaning it. `tests/buildLayout.test.ts` pins the intent.
+ */
+app.setPath('userData', path.join(app.getPath('appData'), app.getName()));
+
+/** Location of the Vite renderer bundle. Derived, never hardcoded — see
+ *  `resolveRendererDist`, which handles the packaged (asar) and dev layouts. */
+const RENDERER_DIST = resolveRendererDist({
+  appPath: app.getAppPath(),
+  isPackaged: app.isPackaged,
+  mainDir: __dirname,
+});
 
 let studioWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
@@ -19,6 +60,33 @@ let weaponSlots: WeaponSlotSwitchService | null = null;
 let isOverlayVisible = true;
 let currentConfig: any = null;
 const isDev = process.env.NODE_ENV === 'development';
+const DEV_SERVER_URL = 'http://localhost:5173';
+
+/** Everything the migration and protocol handlers give up after this long. A
+ *  slow probe must delay startup by a bounded amount, never hang it. */
+const MIGRATION_TIMEOUT_MS = 4000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
+function parseJsonObject(raw: unknown): Record<string, string> {
+  if (typeof raw !== 'string') return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const out: Record<string, string> = {};
+    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof value === 'string') out[key] = value;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
 
 function send(channel: string, window: BrowserWindow | null, payload?: unknown) {
   if (window && !window.isDestroyed() && !window.webContents.isDestroyed()) {
@@ -43,9 +111,9 @@ function createStudioWindow() {
   });
 
   if (isDev) {
-    studioWindow.loadURL('http://localhost:5173');
+    studioWindow.loadURL(DEV_SERVER_URL);
   } else {
-    studioWindow.loadFile(path.join(RENDERER_DIST, 'index.html'));
+    studioWindow.loadURL(STUDIO_URL);
   }
 
   // Weapon-slot switching needs to know when the user is inside crshhx itself.
@@ -96,9 +164,9 @@ function createOverlayWindow() {
   overlayWindow.setIgnoreMouseEvents(true, { forward: true });
 
   if (isDev) {
-    overlayWindow.loadURL('http://localhost:5173/overlay.html');
+    overlayWindow.loadURL(`${DEV_SERVER_URL}/overlay.html`);
   } else {
-    overlayWindow.loadFile(path.join(RENDERER_DIST, 'overlay.html'));
+    overlayWindow.loadURL(OVERLAY_URL);
   }
 
   // A reload/refresh must not lose the crosshair the active slot selected.
@@ -163,7 +231,189 @@ function createWeaponSlotService() {
   weaponSlots.start();
 }
 
-app.whenReady().then(() => {
+/* ------------------------------------------------------------------ *
+ * Production renderer: served from app://crshhx
+ * ------------------------------------------------------------------ */
+
+/**
+ * Answers `app://crshhx/...` from the bundled renderer output.
+ *
+ * Every refusal path is explicit. `resolveAssetPath` rejects other schemes,
+ * other hosts, NUL bytes and anything that resolves outside the bundle, so this
+ * handler cannot be talked into serving arbitrary files from disk — which is the
+ * real risk when an application becomes its own web server.
+ */
+function registerRendererProtocol() {
+  protocol.handle(APP_SCHEME, async (request) => {
+    const url = new URL(request.url);
+
+    if (isStorageProbePath(url.pathname)) {
+      return new Response(legacyProbeHtml(), {
+        status: 200,
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      });
+    }
+
+    const resolved = resolveAssetPath(request.url, RENDERER_DIST);
+    if (!resolved.ok) {
+      console.warn(`[crshhx] Refused ${request.url}: ${resolved.reason}`);
+      return new Response(resolved.reason, {
+        status: resolved.status,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      });
+    }
+
+    if (!existsSync(resolved.filePath)) {
+      return new Response('Not found in the renderer bundle.', {
+        status: 404,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      });
+    }
+
+    try {
+      // The documented way to hand a file to the network stack; it streams, and
+      // it reads through the asar archive transparently.
+      const response = await net.fetch(pathToFileURL(resolved.filePath).toString());
+      // net.fetch sets its own content type; ours is derived from the extension
+      // so a `.woff2` or a `.map` is never mislabelled.
+      const headers = new Headers(response.headers);
+      headers.set('Content-Type', resolved.contentType);
+      return new Response(response.body, { status: response.status, headers });
+    } catch (err) {
+      // Fall back to a direct read. `fs` is patched for asar too, so this works
+      // in the same situations and does not depend on the network stack.
+      console.warn(`[crshhx] net.fetch failed for ${resolved.filePath}, reading directly:`, err);
+      try {
+        const body = readFileSync(resolved.filePath);
+        return new Response(new Uint8Array(body), {
+          status: 200,
+          headers: { 'Content-Type': resolved.contentType },
+        });
+      } catch (readErr) {
+        console.error(`[crshhx] Could not read ${resolved.filePath}:`, readErr);
+        return new Response('Could not read the requested asset.', {
+          status: 500,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        });
+      }
+    }
+  });
+}
+
+/** Applies the Content Security Policy to every response, in both modes. */
+function registerContentSecurityPolicy() {
+  const policy = contentSecurityPolicy({ isDev, devServerUrl: DEV_SERVER_URL });
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const headers = { ...details.responseHeaders };
+    // Replace rather than append: a duplicate CSP header is enforced as the
+    // intersection of both, which is a confusing way to fail.
+    for (const key of Object.keys(headers)) {
+      if (key.toLowerCase() === CSP_HEADER.toLowerCase()) delete headers[key];
+    }
+    headers[CSP_HEADER] = [policy];
+    callback({ responseHeaders: headers });
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Storage migration: file:// origin -> app://crshhx
+ * ------------------------------------------------------------------ */
+
+/** Opens a hidden window on `url`, runs `script`, and always cleans up. */
+async function runInHiddenWindow(url: string, script: string): Promise<unknown> {
+  const probe = new BrowserWindow({
+    show: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      // No preload: this window exists only to touch one origin's storage.
+    },
+  });
+  try {
+    await probe.loadURL(url);
+    return await probe.webContents.executeJavaScript(script, true);
+  } finally {
+    if (!probe.isDestroyed()) probe.destroy();
+  }
+}
+
+/**
+ * Carries saved data across the origin change.
+ *
+ * Runs before any application window is created, and never throws: a migration
+ * that fails must degrade to "start clean", not to "crash on launch". It also
+ * never deletes the source, so a failed migration is recoverable by hand.
+ */
+async function migrateStorageOrigin(): Promise<string> {
+  if (isDev) {
+    // Dev loads from the Vite server, whose origin this change does not touch.
+    return 'Development mode: storage origin unchanged, nothing to migrate.';
+  }
+
+  const probePath = path.join(app.getPath('temp'), `crshhx-migration-${process.pid}.html`);
+  try {
+    // 1. Read the legacy file:// origin. localStorage there is shared across
+    //    file:// pages, so any file on disk will do; it is written to temp
+    //    rather than shipped, so it is not reachable through app://.
+    writeFileSync(probePath, legacyProbeHtml(), 'utf8');
+    const rawSource = await withTimeout(
+      runInHiddenWindow(pathToFileURL(probePath).toString(), dumpScript()),
+      MIGRATION_TIMEOUT_MS,
+      null,
+    );
+    const source = parseJsonObject(rawSource);
+
+    // 2. Read the destination origin, so nothing newer is overwritten.
+    const rawDestination = await withTimeout(
+      runInHiddenWindow(`${APP_ORIGIN}${STORAGE_PROBE_PATH}`, dumpScript()),
+      MIGRATION_TIMEOUT_MS,
+      null,
+    );
+    const destination = parseJsonObject(rawDestination);
+
+    const plan = planMigration(source, destination);
+    if (Object.keys(plan.toCopy).length === 0) return describeMigration(plan);
+
+    // 3. Write. The script re-checks each key, because the destination could
+    //    have changed while the probes were open.
+    const rawWritten = await withTimeout(
+      runInHiddenWindow(`${APP_ORIGIN}${STORAGE_PROBE_PATH}`, injectScript(plan.toCopy)),
+      MIGRATION_TIMEOUT_MS,
+      null,
+    );
+    const written = parseJsonObject({ written: String(rawWritten ?? '[]') }).written;
+    const count = (() => {
+      try {
+        const parsed: unknown = JSON.parse(written ?? '[]');
+        return Array.isArray(parsed) ? parsed.length : 0;
+      } catch {
+        return 0;
+      }
+    })();
+
+    return `${describeMigration(plan)} Wrote ${count} key${count === 1 ? '' : 's'}.`;
+  } catch (err) {
+    // Deliberately not fatal. The old data is still under file://.
+    console.error('[crshhx] Storage migration failed; existing data was left untouched.', err);
+    return `Migration did not complete (${String((err as Error)?.message ?? err)}). Nothing under the previous origin was modified.`;
+  } finally {
+    try {
+      if (existsSync(probePath)) unlinkSync(probePath);
+    } catch {
+      /* a leftover temp file is harmless */
+    }
+  }
+}
+
+app.whenReady().then(async () => {
+  registerRendererProtocol();
+  registerContentSecurityPolicy();
+
+  // Must precede window creation: the studio persists first-run defaults, which
+  // would otherwise claim the keys the migration needs to fill.
+  console.log(`[crshhx] ${await migrateStorageOrigin()}`);
+
   createOverlayWindow();
   createStudioWindow();
   registerHotkeys();
