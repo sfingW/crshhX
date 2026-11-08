@@ -12,6 +12,11 @@ import {
 } from './weaponSlots/migration';
 import type { PresetIndex, WeaponSlotsState } from './weaponSlots/types';
 import { parseColorInput, pushSwatch } from './colorUtils';
+import {
+  emptyLibrary as emptyPresetLibrary,
+  normalizeLibrary,
+  type PresetLibraryState,
+} from './presetOrganizer';
 
 const STORAGE_KEYS = {
   CURRENT_CONFIG: 'crshhx_current_config',
@@ -327,4 +332,43 @@ export function toggleFavoriteId(id: string): string[] {
   const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
   saveFavoriteIds(next);
   return next;
+}
+
+/* ------------------------------------------------------------------ *
+ * Preset organisation (folders, favourites, descriptions, timestamps)
+ *
+ * A sidecar keyed by preset id — see lib/presetOrganizer.ts for why this is not
+ * stored on the crosshair configs themselves. Reading always goes through
+ * normalizeLibrary, so a file written by a newer or older crshhx, or a partly
+ * corrupt one, degrades to "some organisation is missing" rather than to an
+ * exception on startup.
+ * ------------------------------------------------------------------ */
+
+const PRESET_LIBRARY_KEY = 'crshhx_preset_library';
+
+export interface PresetLibraryLoadResult {
+  state: PresetLibraryState;
+  repairs: string[];
+}
+
+export function loadPresetLibrary(): PresetLibraryLoadResult {
+  try {
+    const raw = localStorage.getItem(PRESET_LIBRARY_KEY);
+    if (!raw) return { state: emptyPresetLibrary(), repairs: [] };
+    return normalizeLibrary(JSON.parse(raw));
+  } catch (err) {
+    console.error('Failed to read the preset library:', err);
+    return {
+      state: emptyPresetLibrary(),
+      repairs: ['The saved preset library could not be read, so organisation was reset. Your crosshairs are untouched.'],
+    };
+  }
+}
+
+export function savePresetLibrary(state: PresetLibraryState): void {
+  try {
+    localStorage.setItem(PRESET_LIBRARY_KEY, JSON.stringify(state));
+  } catch (err) {
+    console.error('Failed to save the preset library:', err);
+  }
 }
