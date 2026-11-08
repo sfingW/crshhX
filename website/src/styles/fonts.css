@@ -1,0 +1,62 @@
+/**
+ * Self-hosted latin font subsets.
+ *
+ * The `@fontsource/*` packages are the source of the woff2 files (they are
+ * devDependencies), but their own CSS also lists `.woff` fallbacks that no
+ * modern browser will ever request. Referencing the woff2 files directly keeps
+ * those six dead files out of the build while staying fully self-hosted and
+ * offline-capable.
+ */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fonts/inter/files/inter-latin-400-normal.woff2')
+    format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url('@fonts/inter/files/inter-latin-500-normal.woff2')
+    format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('@fonts/inter/files/inter-latin-600-normal.woff2')
+    format('woff2');
+}
+
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url('@fonts/space-grotesk/files/space-grotesk-latin-500-normal.woff2')
+    format('woff2');
+}
+
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('@fonts/space-grotesk/files/space-grotesk-latin-700-normal.woff2')
+    format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fonts/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2')
+    format('woff2');
+}

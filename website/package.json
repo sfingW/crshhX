@@ -1,0 +1,33 @@
+{
+  "name": "crshhx-website",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Official website for crshhx (Crshhx Crosshair Studio). Deliberately isolated from the desktop application: its own dependencies, build, tests and deploy configuration.",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run build:client && npm run build:server && node scripts/prerender.mjs",
+    "build:client": "vite build",
+    "build:server": "vite build --ssr src/entry-server.tsx --outDir dist-server",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^6.30.0"
+  },
+  "devDependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.2.0",
+    "@fontsource/space-grotesk": "^5.2.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^25.0.1",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0",
+    "vitest": "^3.2.7"
+  }
+}

@@ -1,0 +1,170 @@
+import { StrictMode, act } from 'react';
+import { hydrateRoot, type Root } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { App } from '../src/App';
+import { routeFor } from '../src/site';
+import { renderRoute } from './helpers';
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+/**
+ * The site ships prerendered HTML, so a hydration mismatch is a real defect:
+ * it means the browser throws away markup and flashes content. These tests
+ * render on the "server", hydrate in jsdom, and fail on any console output
+ * React produces while doing it.
+ */
+describe('hydration', () => {
+  let root: Root | null = null;
+  const problems: string[] = [];
+
+  beforeEach(() => {
+    problems.length = 0;
+    vi.spyOn(console, 'error').mockImplementation((message: unknown) => {
+      problems.push(`console.error: ${String(message)}`);
+    });
+    vi.spyOn(console, 'warn').mockImplementation((message: unknown) => {
+      problems.push(`console.warn: ${String(message)}`);
+    });
+    document.body.innerHTML = '';
+    // Mirror the prerendered shell so the metadata effect has something to update.
+    document.head.innerHTML = '<title></title><meta name="description" content="" />';
+    // jsdom implements neither, and both are legitimate browser calls.
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    Element.prototype.scrollIntoView = vi.fn();
+    window.history.pushState({}, '', '/');
+  });
+
+  afterEach(() => {
+    if (root) act(() => root?.unmount());
+    root = null;
+    vi.restoreAllMocks();
+    document.body.innerHTML = '';
+  });
+
+  async function hydrate(path: string) {
+    // The router reads the location at hydration time, exactly as a browser
+    // would when it requests a prerendered file.
+    window.history.pushState({}, '', path);
+    document.body.innerHTML = `<div id="root">${renderRoute(path)}</div>`;
+    const container = document.getElementById('root');
+    if (!container) throw new Error('no root element');
+    const prerendered = container.innerHTML;
+    await act(async () => {
+      root = hydrateRoot(
+        container,
+        <StrictMode>
+          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <App />
+          </BrowserRouter>
+        </StrictMode>,
+      );
+    });
+    return { container, prerendered };
+  }
+
+  it('hydrates the prerendered home page without changing its markup', async () => {
+    const { container, prerendered } = await hydrate('/');
+    expect(problems).toEqual([]);
+
+    const headline = container.querySelector('h1');
+    expect(headline?.textContent).toContain('Your crosshair');
+    expect(container.querySelectorAll('h1')).toHaveLength(1);
+
+    expect(headline?.textContent).toBe('Your crosshair, exactly where you put it.');
+    expect(headline?.querySelector('em')?.textContent).toBe('exactly');
+
+    // React must reuse the server markup rather than throw it away, so the
+    // hydrated tree has the same elements the prerender produced.
+    const prerenderedCards = (prerendered.match(/class="card"/g) ?? []).length;
+    expect(container.querySelectorAll('.card').length).toBe(prerenderedCards);
+    expect(prerenderedCards).toBeGreaterThan(5);
+    const prerenderedSvgs = (prerendered.match(/<svg/g) ?? []).length;
+    expect(container.querySelectorAll('svg').length).toBe(prerenderedSvgs);
+
+    expect(container.querySelector('.nav')).not.toBeNull();
+    expect(container.querySelector('.footer')).not.toBeNull();
+    expect(container.querySelectorAll('.reveal').length).toBeGreaterThan(4);
+    expect(document.title).toBe(routeFor('/')?.title);
+  });
+
+  it('hydrates every other route cleanly', async () => {
+    for (const path of ['/features', '/download', '/docs', '/changelog'] as const) {
+      problems.length = 0;
+      const { container } = await hydrate(path);
+      expect(problems, path).toEqual([]);
+      expect(container.querySelectorAll('h1'), path).toHaveLength(1);
+      expect(document.title, path).toBe(routeFor(path)?.title);
+      act(() => root?.unmount());
+      root = null;
+    }
+  });
+
+  it('renders the 404 page for an unknown path', async () => {
+    problems.length = 0;
+    const { container } = await hydrate('/404');
+    expect(problems).toEqual([]);
+    expect(container.textContent).toContain('off-centre');
+    expect(document.title).toBe('Page not found — crshhx');
+  });
+
+  it('navigates client-side and updates the document metadata', async () => {
+    const { container } = await hydrate('/');
+    const link = container.querySelector<HTMLAnchorElement>('a[href="/features"]');
+    expect(link).not.toBeNull();
+
+    await act(async () => {
+      link?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
+
+    expect(problems).toEqual([]);
+    expect(window.location.pathname).toBe('/features');
+    expect(container.querySelector('h1')?.textContent).toBe(
+      'What the application actually does',
+    );
+    expect(container.querySelectorAll('h1')).toHaveLength(1);
+    expect(document.title).toBe(routeFor('/features')?.title);
+    expect(document.querySelector('meta[name="description"]')?.getAttribute('content')).toBe(
+      routeFor('/features')?.description,
+    );
+    expect(container.querySelector('.nav-link.active')?.textContent).toBe('Features');
+  });
+
+  it('opens the mobile navigation and closes it when a link is used', async () => {
+    const { container } = await hydrate('/');
+    const burger = container.querySelector<HTMLButtonElement>('.nav-burger');
+    expect(burger).not.toBeNull();
+    expect(container.querySelector('.nav-menu')).toBeNull();
+    expect(burger?.getAttribute('aria-expanded')).toBe('false');
+
+    await act(async () => {
+      burger?.click();
+    });
+    expect(container.querySelector('.nav-menu')).not.toBeNull();
+    expect(burger?.getAttribute('aria-expanded')).toBe('true');
+    expect(container.querySelectorAll('.nav-menu-link').length).toBe(5);
+
+    const docsLink = container.querySelector<HTMLAnchorElement>('.nav-menu a[href="/docs"]');
+    await act(async () => {
+      docsLink?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
+
+    expect(problems).toEqual([]);
+    expect(window.location.pathname).toBe('/docs');
+    expect(container.querySelector('.nav-menu')).toBeNull();
+    expect(container.querySelector('h1')?.textContent).toBe('How crshhx works');
+  });
+
+  it('leaves the download call to action disabled while nothing has shipped', async () => {
+    const { container } = await hydrate('/download');
+    const buttons = [...container.querySelectorAll<HTMLButtonElement>('.dl-card button')];
+    expect(buttons.length).toBe(2);
+    for (const button of buttons) {
+      expect(button.disabled).toBe(true);
+      expect(button.getAttribute('aria-disabled')).toBe('true');
+      expect(button.closest('a')).toBeNull();
+    }
+    expect(container.querySelectorAll('a[href$=".exe"]')).toHaveLength(0);
+    expect(container.textContent).toContain('No verified build has been published yet');
+  });
+});

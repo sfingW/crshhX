@@ -5,3 +5,6 @@ dist
 
 # Packaging output — generated, never committed
 release/
+
+# Website server-build output — generated, never committed
+dist-server

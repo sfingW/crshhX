@@ -1,0 +1,33 @@
+{
+  "channel": "unreleased",
+  "latest": null,
+  "published": [],
+  "development": [
+    {
+      "version": "1.0.0",
+      "date": "2026-11-08",
+      "status": "unreleased",
+      "summary": "First release candidate in development. Everything below is in the repository and covered by 1,061 automated tests; no Windows executable has been published yet.",
+      "added": [
+        "Weapon-slot crosshairs: record a key per slot and switch reticles mid-game without touching the game process.",
+        "Crosshair editor with per-arm length and thickness, whole-reticle rotation and scale, inner outline, colour tools with contrast verdicts, undo history and an A/B compare panel.",
+        "Preset manager with folders, favourites, descriptions, search and sort; built-in presets can be organised without being modified.",
+        "Versioned import and export with a two-step preview: nothing is overwritten unless that entry is set to replace it.",
+        "Game profiles with optional foreground-process auto-selection.",
+        "Stretched-resolution compensation (4:3, 16:10, 5:4 and custom ratios).",
+        "ADS morphing (shrink, dot-only, fade) and dynamic firing bloom with a configurable decay.",
+        "A live overlay window with F10 to toggle and F9 to cycle presets."
+      ],
+      "improved": [
+        "Renderer bundle reduced by 35% by dropping legacy .woff font fallbacks Chromium never reads.",
+        "Storage migration runs once per install instead of on every launch.",
+        "Packaging configuration for an NSIS installer and a portable executable, with a release workflow that prints measured sizes and SHA-256 hashes."
+      ],
+      "fixed": [
+        "Favourites were stored in two places that disagreed with each other.",
+        "An import could silently lose a crosshair when two entries wanted the same id.",
+        "The storage migration never wrote its completion marker on a fresh install, repeating its probe on every launch."
+      ]
+    }
+  ]
+}

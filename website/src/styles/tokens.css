@@ -1,0 +1,74 @@
+/* ------------------------------------------------------------------ *
+ * crshhx website — design tokens
+ *
+ * The palette is derived from the application's own mark: an ink field,
+ * a pale mint ring and an emerald reticle. The site uses the *ring* as its
+ * interactive accent and reserves saturated reticle colours for product
+ * visuals, where they are information rather than decoration.
+ * ------------------------------------------------------------------ */
+
+:root {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --ink-0: #0b0e12; /* page */
+  --ink-1: #0f1319; /* raised */
+  --ink-2: #141a21; /* cards, panels */
+  --ink-3: #1a212a; /* hover panels, code */
+
+  /* Lines */
+  --line: rgba(226, 236, 238, 0.09);
+  --line-strong: rgba(226, 236, 238, 0.16);
+
+  /* Text */
+  --text: #e8edef;
+  --text-dim: #98a4ab;
+  --text-faint: #6b767e;
+
+  /* Brand — the pale mint of the mark's ring */
+  --brand: #6fd9c0;
+  --brand-bright: #93e8d3;
+  --brand-deep: #0f3f36;
+  --on-brand: #05231c;
+
+  /* Product colours, used only for reticles and product visuals */
+  --reticle-cyan: #35e0ff;
+  --reticle-green: #2be08a;
+  --reticle-white: #f2f5f6;
+  --reticle-magenta: #ff5ea8;
+  --reticle-amber: #ffc24d;
+  --reticle-red: #ff5c5c;
+
+  /* Semantic */
+  --warn: #e0a458;
+  --danger: #e0705f;
+
+  /* Type */
+  --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+
+  /* Shape */
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 14px;
+
+  /* Motion */
+  --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
+  --duration: 420ms;
+
+  /* Layout */
+  --container: 1120px;
+  --nav-h: 64px;
+}
