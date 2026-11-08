@@ -76,12 +76,23 @@ describe('export', () => {
     expect(JSON.parse(text).format).toBe(TRANSFER_FORMAT);
   });
 
-  it('normalises configs on the way out so a file only contains supported values', () => {
+  // Deliberate reversal of an earlier decision. Repairing on the way out *and*
+  // on the way in fixed a broken value twice and told nobody: the exporter's
+  // local library still held the bad value while the file silently disagreed
+  // with it. The importer is the single validator, and it reports its repairs.
+  it('writes values as they are, leaving the importer to repair and report', () => {
     const text = exportPresets({ presets: [preset('a', 'Alpha', { length: 9999 })] }, T0);
+    expect(text).toContain('"length": 9999');
+
     const parsed = parseTransferFile(text);
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
-    expect(parsed.envelope.presets[0].config.length).toBeLessThanOrEqual(50);
+    // The file carries the user's own value, not a quietly corrected one.
+    expect(parsed.envelope.presets[0].config.length).toBe(9999);
+
+    const plan = planImport(parsed.envelope, { presets: [], settings: DEFAULT_APP_SETTINGS });
+    expect(plan.entries[0].incoming.length).toBeLessThanOrEqual(50);
+    expect(plan.entries[0].repairs).toHaveLength(1);
   });
 
   it('leaves organisation out for presets the user never touched', () => {
@@ -741,5 +752,93 @@ describe('a full backup round trip', () => {
     if (!planned.ok) return;
     expect(planned.plan.counts.total).toBe(COMPLETE_CROSSHAIR_VAULT.length);
     expect(planned.plan.entries.flatMap((e) => e.repairs)).toEqual([]);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Regressions found while wiring the import UI
+ * ------------------------------------------------------------------ */
+
+describe('planImport id allocation across a whole file', () => {
+  it('never hands one entry an id that a later entry in the same file needs', () => {
+    // `custom-1` collides with the local library, so it must be renumbered.
+    // Naively walking `custom-2`, `custom-3`… would land on the id the *next*
+    // entry in the file is about to claim, and that entry would then be
+    // reported as an in-file duplicate and skipped — losing a crosshair the
+    // user never chose to lose.
+    const envelope = buildEnvelope(
+      {
+        presets: [
+          preset('custom-1', 'First'),
+          preset('custom-2', 'Second'),
+          preset('custom-3', 'Third'),
+        ],
+      },
+      'presets',
+      T0,
+    );
+
+    const plan = planImport(envelope, {
+      presets: [preset('custom-1', 'Already here')],
+      settings: DEFAULT_APP_SETTINGS,
+    });
+
+    // All three arrive: `add-with-new-id` is still an add, not a skip.
+    expect(plan.counts).toMatchObject({ total: 3, add: 3, overwrite: 0, skip: 0 });
+    expect(plan.entries.map((entry) => entry.status)).toEqual(['id-conflict', 'new', 'new']);
+
+    const assigned = plan.entries[0].assignedId!;
+    expect(assigned).not.toBe('custom-1');
+    // The replacement must not collide with anything local OR anything in the file.
+    expect(['custom-2', 'custom-3']).not.toContain(assigned);
+    expect(assigned).toBe('custom-4');
+
+    // And every incoming id survives, so nothing is silently dropped.
+    const finalIds = plan.entries.map((entry) => entry.assignedId);
+    expect(new Set(finalIds).size).toBe(3);
+  });
+
+  it('still reports a genuine in-file duplicate as skipped', () => {
+    const envelope = buildEnvelope(
+      { presets: [preset('custom-1', 'First'), preset('custom-1', 'Second')] },
+      'presets',
+      T0,
+    );
+    const plan = planImport(envelope, { presets: [], settings: DEFAULT_APP_SETTINGS });
+
+    expect(plan.entries[1].status).toBe('duplicate-in-file');
+    expect(plan.entries[1].action).toBe('skip');
+    expect(plan.counts).toMatchObject({ add: 1, skip: 1 });
+  });
+});
+
+describe('export fidelity', () => {
+  it('writes values as the user has them, so the importer can report what it repairs', () => {
+    // Repairing on the way out *and* on the way in would fix a broken value
+    // twice and tell nobody. The importer is the single validator.
+    const text = exportPresets({ presets: [preset('custom-9', 'Broken', { length: 9999 })] }, T0);
+    expect(text).toContain('"length": 9999');
+
+    const parsed = parseTransferFile(text);
+    expect(parsed.ok).toBe(true);
+    const plan = planImport((parsed as { ok: true; envelope: TransferEnvelope }).envelope, {
+      presets: [],
+      settings: DEFAULT_APP_SETTINGS,
+    });
+
+    expect(plan.entries[0].repairs).toHaveLength(1);
+    expect(plan.entries[0].repairs[0]).toMatch(/length/);
+    expect(plan.notes.join(' ')).toMatch(/outside the ranges crshhx supports/);
+  });
+
+  it('exports an ordinary, valid preset unchanged', () => {
+    const fine = preset('custom-1', 'Fine', { length: 6 });
+    const parsed = parseTransferFile(exportPresets({ presets: [fine] }, T0));
+    const plan = planImport((parsed as { ok: true; envelope: TransferEnvelope }).envelope, {
+      presets: [],
+      settings: DEFAULT_APP_SETTINGS,
+    });
+    expect(plan.entries[0].repairs).toEqual([]);
+    expect(plan.entries[0].incoming.length).toBe(6);
   });
 });

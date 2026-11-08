@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   Crosshair,
+  FolderOpen,
   Sliders,
   Move,
   Keyboard,
@@ -12,6 +13,7 @@ import {
 export type ActiveNavView =
   | 'vault'
   | 'favorites'
+  | 'library'
   | 'designer'
   | 'calibration'
   | 'keybinds'
@@ -82,6 +84,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onSelectView }) =>
             >
               <Star className="w-4 h-4" />
               <span>Saved & Favorites</span>
+            </button>
+
+            <button
+              onClick={() => onSelectView('library')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-md font-medium transition-all ${
+                activeView === 'library'
+                  ? 'bg-surface-card font-semibold'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-surface-cardHover'
+              }`}
+              style={{
+                color: activeView === 'library' ? 'var(--brand-accent)' : undefined,
+              }}
+            >
+              <FolderOpen className="w-4 h-4" />
+              <span>Preset Manager</span>
             </button>
           </div>
 

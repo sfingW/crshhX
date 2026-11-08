@@ -11,7 +11,26 @@ import {
   loadWeaponSlotsRuntimeState,
   saveWeaponSlotsState,
   createDebouncedRuntimeSaver,
+  loadPresetLibrary,
+  savePresetLibrary,
 } from '../lib/storage';
+import {
+  markModified,
+  markUsed,
+  pruneOrphans,
+  type PresetLibraryState,
+} from '../lib/presetOrganizer';
+import {
+  applyImport,
+  exportConfiguration,
+  exportPresets,
+  planFromFile,
+  suggestedFileName,
+  type ImportPlan,
+} from '../lib/presetTransfer';
+import { downloadTextFile, formatBytes, isTooLarge, pickAndReadTextFile } from '../lib/fileTransfer';
+import { PresetManagerView } from '../components/views/PresetManagerView';
+import { ImportPreviewModal, type ImportChoices } from '../components/modals/ImportPreviewModal';
 import { Sidebar, ActiveNavView } from '../components/Sidebar';
 import { TopHeader } from '../components/TopHeader';
 import { CrosshairsView } from '../components/views/CrosshairsView';
@@ -38,6 +57,21 @@ export const App: React.FC = () => {
   });
   const [appSettings, setAppSettings] = useState<AppSettings>(loadAppSettings);
   const [customPresets, setCustomPresets] = useState<CrosshairConfig[]>(loadCustomPresets);
+  /* Preset organisation: folders, favourites, descriptions, timestamps. */
+  const [presetLibrary, setPresetLibrary] = useState<PresetLibraryState>(() => loadPresetLibrary().state);
+  const [importPreview, setImportPreview] = useState<{
+    fileName: string;
+    sizeLabel: string;
+    plan: ImportPlan | null;
+    error: string | null;
+  } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 6000);
+    return () => clearTimeout(timer);
+  }, [notice]);
   const [activeView, setActiveView] = useState<ActiveNavView>(() => {
     const params = new URLSearchParams(window.location.search);
     const view = params.get('view') as ActiveNavView;
@@ -191,6 +225,8 @@ export const App: React.FC = () => {
   const handleSelectCrosshair = (selected: CrosshairConfig) => {
     setConfig(selected);
     saveCurrentConfig(selected);
+    // "Recently used" sorting is only honest if applying a crosshair records it.
+    commitLibrary(markUsed(presetLibrary, selected.id));
   };
 
   const handleOpenDesignerWithConfig = (selected: CrosshairConfig) => {
@@ -211,7 +247,197 @@ export const App: React.FC = () => {
     saveCustomPresets(nextList);
     setConfig(newCustom);
     saveCurrentConfig(newCustom);
+    commitLibrary(markUsed(markModified(presetLibrary, newCustom.id), newCustom.id));
     alert(`Reticle "${name}" saved to your collection!`);
+  };
+
+  /* ---------------- Preset manager ---------------- */
+
+  const commitLibrary = useCallback((next: PresetLibraryState) => {
+    setPresetLibrary(next);
+    savePresetLibrary(next);
+  }, []);
+
+  /**
+   * Everything the manager can list, as full configs. `listSelectablePresets`
+   * already de-duplicates the vault, the pro presets and the user's own, so this
+   * reuses that ordering rather than inventing a second one.
+   */
+  const managedPresets = useMemo(
+    () => selectablePresets.map((entry) => entry.config),
+    [selectablePresets],
+  );
+
+  /** Ids the user owns and may therefore rename or delete. */
+  const editablePresetIds = useMemo(
+    () => new Set(customPresets.map((preset) => preset.id)),
+    [customPresets],
+  );
+
+  /** Which weapon-slot profiles point at each preset, so a delete can warn. */
+  const presetUsage = useMemo(() => {
+    const usage: Record<string, string[]> = {};
+    for (const profile of weaponSlotsState?.profiles ?? []) {
+      for (const slot of profile.slots) {
+        const id = slot.presetId;
+        if (!id) continue;
+        const list = usage[id] ?? (usage[id] = []);
+        if (!list.includes(profile.name)) list.push(profile.name);
+      }
+    }
+    return usage;
+  }, [weaponSlotsState]);
+
+  const persistCustomPresets = useCallback((next: CrosshairConfig[]) => {
+    setCustomPresets(next);
+    saveCustomPresets(next);
+  }, []);
+
+  const handleRenamePreset = (id: string, name: string) => {
+    const next = customPresets.map((preset) => (preset.id === id ? { ...preset, name } : preset));
+    persistCustomPresets(next);
+    if (config.id === id) {
+      const renamed = { ...config, name };
+      setConfig(renamed);
+      saveCurrentConfig(renamed);
+    }
+    commitLibrary(markModified(presetLibrary, id));
+    setNotice(`Renamed to “${name}”.`);
+  };
+
+  const handleDuplicatePreset = (source: CrosshairConfig) => {
+    const copy: CrosshairConfig = {
+      ...source,
+      id: `custom-${Date.now()}`,
+      name: `${source.name} (Copy)`.slice(0, 60),
+      isBuiltIn: false,
+    };
+    persistCustomPresets([copy, ...customPresets]);
+    commitLibrary(markModified(presetLibrary, copy.id));
+    setNotice(`Saved an editable copy as “${copy.name}”.`);
+  };
+
+  const handleDeletePreset = (id: string) => {
+    const target = customPresets.find((preset) => preset.id === id);
+    if (!target) return;
+    persistCustomPresets(customPresets.filter((preset) => preset.id !== id));
+    // Its organisation goes too, so a reused id cannot inherit a stale folder.
+    commitLibrary(pruneOrphans(presetLibrary, managedPresets.map((p) => p.id).filter((x) => x !== id)).state);
+    const usedBy = presetUsage[id] ?? [];
+    setNotice(
+      usedBy.length > 0
+        ? `Deleted “${target.name}”. ${usedBy.length} weapon-slot profile${usedBy.length === 1 ? '' : 's'} now reference a missing crosshair: ${usedBy.join(', ')}.`
+        : `Deleted “${target.name}”.`,
+    );
+  };
+
+  const handleExportPresets = (configs: readonly CrosshairConfig[], library: PresetLibraryState) => {
+    if (configs.length === 0) {
+      setNotice('Nothing to export — the current list is empty.');
+      return;
+    }
+    downloadTextFile(
+      suggestedFileName('presets'),
+      exportPresets({ presets: configs, library }),
+    );
+    setNotice(`Exported ${configs.length} crosshair${configs.length === 1 ? '' : 's'}.`);
+  };
+
+  const handleExportConfiguration = () => {
+    downloadTextFile(
+      suggestedFileName('configuration'),
+      exportConfiguration({
+        // Only the user's own crosshairs: built-ins exist on any install, and
+        // their organisation travels in the library sidecar by id.
+        presets: customPresets,
+        library: presetLibrary,
+        settings: appSettings,
+        weaponSlots: weaponSlotsState ?? undefined,
+      }),
+    );
+    setNotice('Backup written. It contains your crosshairs, folders, settings and weapon-slot profiles.');
+  };
+
+  const handleImportFile = async () => {
+    let picked;
+    try {
+      picked = await pickAndReadTextFile();
+    } catch (err) {
+      setImportPreview({
+        fileName: 'unknown',
+        sizeLabel: '',
+        plan: null,
+        error: (err as Error).message,
+      });
+      return;
+    }
+    if (!picked) return; // the user cancelled
+    if (isTooLarge(picked.sizeBytes)) {
+      setImportPreview({
+        fileName: picked.fileName,
+        sizeLabel: formatBytes(picked.sizeBytes),
+        plan: null,
+        error: `That file is ${formatBytes(picked.sizeBytes)}. A crshhx export is normally a few hundred kilobytes, so this is probably not one.`,
+      });
+      return;
+    }
+
+    const planned = planFromFileOrError(picked.text);
+    setImportPreview({
+      fileName: picked.fileName,
+      sizeLabel: formatBytes(picked.sizeBytes),
+      ...planned,
+    });
+  };
+
+  /** Planning is kept separate so the modal can show a parse error on its own. */
+  const planFromFileOrError = (text: string): { plan: ImportPlan | null; error: string | null } => {
+    const result = planFromFile(text, { presets: managedPresets, settings: appSettings });
+    return result.ok ? { plan: result.plan, error: null } : { plan: null, error: result.error };
+  };
+
+  const handleConfirmImport = (choices: ImportChoices) => {
+    if (!importPreview?.plan) return;
+    const plan = importPreview.plan;
+    for (const entry of plan.entries) {
+      if (choices.overwrites.includes(entry.index)) {
+        entry.action = 'overwrite';
+        entry.assignedId = entry.incoming.id;
+      } else if (choices.skips.includes(entry.index)) {
+        entry.action = 'skip';
+      }
+    }
+
+    const result = applyImport({
+      plan,
+      existing: { presets: customPresets, settings: appSettings },
+      library: presetLibrary,
+      settings: appSettings,
+      applySettings: choices.applySettings,
+      applyWeaponSlots: choices.applyWeaponSlots,
+    });
+
+    // Imported crosshairs become the user's own, so they are editable from now on.
+    const imported = result.targets.presets.filter((preset) => !editablePresetIds.has(preset.id));
+    persistCustomPresets([...imported.map((preset) => ({ ...preset, isBuiltIn: false })), ...customPresets]);
+    commitLibrary(result.targets.library);
+
+    if (choices.applySettings) {
+      setAppSettings(result.targets.settings);
+      saveAppSettings(result.targets.settings);
+    }
+    if (choices.applyWeaponSlots && result.targets.weaponSlots && weaponSlotsState) {
+      setWeaponSlotsState(result.targets.weaponSlots);
+      saveWeaponSlotsState(result.targets.weaponSlots);
+    }
+
+    setImportPreview(null);
+    setNotice(
+      `Imported ${result.added} crosshair${result.added === 1 ? '' : 's'}` +
+        (result.overwritten ? `, replaced ${result.overwritten}` : '') +
+        (result.skipped ? `, skipped ${result.skipped}` : '') +
+        '.',
+    );
   };
 
   const handleToggleOverlay = () => {
@@ -261,6 +487,35 @@ export const App: React.FC = () => {
           weaponSlotPulse={slotPulse}
         />
 
+        {/* Transient status: what the last library action actually did. */}
+        {notice && (
+          <div
+            role="status"
+            className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 max-w-xl px-3.5 py-2 rounded-lg border border-surface-border bg-surface-card shadow-xl text-[11.5px] text-zinc-200 leading-snug"
+          >
+            {notice}
+            <button
+              type="button"
+              onClick={() => setNotice(null)}
+              aria-label="Dismiss message"
+              className="ml-2.5 text-zinc-500 hover:text-zinc-100 transition-colors"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {importPreview && (
+          <ImportPreviewModal
+            fileName={importPreview.fileName}
+            sizeLabel={importPreview.sizeLabel}
+            plan={importPreview.plan}
+            error={importPreview.error}
+            onClose={() => setImportPreview(null)}
+            onConfirm={handleConfirmImport}
+          />
+        )}
+
         {/* View Routing */}
         <div className="flex-1 flex overflow-hidden">
           {(activeView === 'vault' || activeView === 'favorites') && (
@@ -270,6 +525,25 @@ export const App: React.FC = () => {
               onOpenDesignerWithConfig={handleOpenDesignerWithConfig}
               searchQuery={searchQuery}
               activeSubTab={activeView === 'favorites' ? 'saved' : activeSubTab}
+            />
+          )}
+
+          {activeView === 'library' && (
+            <PresetManagerView
+              presets={managedPresets}
+              editableIds={editablePresetIds}
+              library={presetLibrary}
+              onLibraryChange={commitLibrary}
+              currentConfigId={config.id}
+              usage={presetUsage}
+              onApply={handleSelectCrosshair}
+              onEdit={handleOpenDesignerWithConfig}
+              onRename={handleRenamePreset}
+              onDuplicate={handleDuplicatePreset}
+              onDelete={handleDeletePreset}
+              onExportPresets={handleExportPresets}
+              onExportConfiguration={handleExportConfiguration}
+              onImportFile={handleImportFile}
             />
           )}
 

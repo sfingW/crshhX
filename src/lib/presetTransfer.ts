@@ -113,11 +113,13 @@ function metaFor(
 export function buildEnvelope(source: ExportSource, kind: TransferKind, now = Date.now()): TransferEnvelope {
   const library = source.library;
   const presets: ExportedPreset[] = source.presets.map((config) => {
-    // Normalising on the way out means a file always contains values this
-    // schema understands, even if the in-memory config pre-dates it.
-    const { config: normalised } = normalizeCrosshairConfig(config, `export:${config.id}`);
-    const meta = metaFor(normalised, library);
-    return meta ? { config: normalised, meta } : { config: normalised };
+    // Values are written out as the user has them. The importer is the single
+    // place that validates and repairs, and it reports what it changed — so
+    // repairing here too would fix a broken value twice and tell nobody. A
+    // local library is already schema-normalised when it loads, so in practice
+    // exported files carry valid values anyway.
+    const meta = metaFor(config, library);
+    return meta ? { config, meta } : { config };
   });
 
   const envelope: TransferEnvelope = {
@@ -357,8 +359,27 @@ export function planImport(envelope: TransferEnvelope, existing: ExistingState):
   const existingNames = new Map(
     existing.presets.map((p) => [p.name.trim().toLowerCase(), p.id]),
   );
-  /** Ids already claimed by an earlier entry in this same file. */
-  const claimed = new Set<string>(existingById.keys());
+  /**
+   * Every id this file wants, collected before any allocation happens.
+   *
+   * Without this the id allocator can hand entry 1 an id that entry 2 also
+   * needs, and entry 2 then gets reported as a duplicate and skipped — the file
+   * loses a crosshair the user never chose to lose.
+   */
+  const idsInFile = new Set<string>(
+    envelope.presets
+      .map((raw) => {
+        if (!isRecord(raw)) return '';
+        const config = isRecord(raw.config) ? raw.config : raw;
+        return typeof config.id === 'string' ? config.id.trim() : '';
+      })
+      .filter(Boolean),
+  );
+
+  /** Ids that may not be handed out: everything local, plus the whole file. */
+  const claimed = new Set<string>([...existingById.keys(), ...idsInFile]);
+  /** Ids already seen while walking the file, for genuine in-file duplicates. */
+  const seen = new Set<string>();
 
   const entries: ImportEntry[] = [];
   for (let index = 0; index < envelope.presets.length; index++) {
@@ -399,7 +420,7 @@ export function planImport(envelope: TransferEnvelope, existing: ExistingState):
         }
       : null;
 
-    const inFile = claimed.has(incoming.id) && existingById.has(incoming.id) === false;
+    const inFile = seen.has(incoming.id);
     const idCollision = existingById.has(incoming.id);
     const nameCollision = existingNames.get(incoming.name.trim().toLowerCase());
 
@@ -428,7 +449,7 @@ export function planImport(envelope: TransferEnvelope, existing: ExistingState):
       note = `You already have a crosshair called “${incoming.name}”. Both will be kept.`;
     }
 
-    claimed.add(incoming.id);
+    seen.add(incoming.id);
     if (action !== 'skip' && assignedId) claimed.add(assignedId);
 
     entries.push({
