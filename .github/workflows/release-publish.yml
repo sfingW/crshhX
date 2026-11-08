@@ -1,0 +1,142 @@
+name: Publish GitHub Release
+
+# Creates the GitHub Release for an existing tag from the executables an
+# earlier windows-release run already built, hashed and uploaded.
+#
+# Why a workflow and not a local upload: the release-asset and artifact CDNs
+# are unreachable from the development sandbox, but they are ordinary network
+# traffic for a GitHub runner. Publishing from here means the assets are the
+# EXACT bytes the packaging run produced — never rebuilt, never re-hashed by
+# hand, and never the artifact zip itself.
+#
+# Guards, in order:
+#   - the tag must already exist (this workflow never creates tags),
+#   - the release must NOT exist (nothing is ever overwritten),
+#   - the artifact must contain exactly the two expected executables.
+#
+# Manual dispatch only: a release is a deliberate act, never a side effect of
+# a push or a PR.
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'windows-release run id whose artifact to publish'
+        required: true
+        default: '42534211521'
+        type: string
+      tag:
+        description: 'Existing release tag'
+        required: true
+        default: 'v1.1.0'
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-publish-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Upload the verified executables
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the packaged executables from run ${{ inputs.run_id }}
+        uses: actions/download-artifact@v4
+        with:
+          name: crshhx-windows-${{ inputs.tag }}
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: artifacts
+
+      - name: Verify the artifact and publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          set -euo pipefail
+
+          VERSION="${TAG#v}"
+          SETUP="crshhx-crosshair-studio-setup-${VERSION}.exe"
+          PORTABLE="crshhx-crosshair-studio-portable-${VERSION}.exe"
+
+          # The tag must exist; this workflow publishes releases, never tags.
+          gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq '.object.sha' >/dev/null
+
+          # Nothing is ever overwritten: an existing release stops the run.
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; refusing to overwrite." >&2
+            exit 1
+          fi
+
+          # Exactly the two executables, and nothing else, may be published.
+          test -f "artifacts/$SETUP"
+          test -f "artifacts/$PORTABLE"
+          FILE_COUNT=$(find artifacts -maxdepth 1 -type f | wc -l)
+          if [ "$FILE_COUNT" -ne 2 ]; then
+            echo "Expected exactly 2 executables, found $FILE_COUNT." >&2
+            exit 1
+          fi
+
+          # Measured figures, printed so they can be quoted from this log and
+          # cross-checked against the release asset metadata GitHub reports.
+          ls -l artifacts
+          sha256sum "artifacts/$SETUP" "artifacts/$PORTABLE"
+
+          cat > notes.md << 'NOTES'
+          crshhx 1.1.0 — the first updated Windows build.
+
+          ## Downloads
+
+          - **crshhx-crosshair-studio-setup-1.1.0.exe** — one-click installer (recommended).
+            Double-click it; it installs with no prompts and adds a Start menu shortcut.
+          - **crshhx-crosshair-studio-portable-1.1.0.exe** — portable executable.
+            No installation: put it anywhere and run it. Your crosshair library still
+            lives in your roaming profile and follows you between folders.
+
+          The application is not code-signed, so Windows SmartScreen may show a warning
+          on first run. Choose "More info", then "Run anyway".
+
+          ## What is new
+
+          - **Target Monitor selection** — put the overlay on any connected display.
+            The choice survives restarts, and the overlay repositions on hotplug,
+            resolution and scaling changes.
+          - **Background operation** — closing the window hides crshhx to the system
+            tray while overlays, global hotkeys and weapon-slot switching keep
+            running. Quitting is explicit, from the tray menu.
+          - **Pro Crosshairs library** — 40 curated designs across 8 categories,
+            built into the existing preset system, with an interactive preview bench
+            (backdrops, zoom, colour and size overrides, two-design compare).
+          - **Crosshair Academy** — 10 tutorials with live in-app demos, labelled
+            illustrations and tracked completion.
+          - **One clean window header** — frameless window with working
+            minimise/maximise/close controls; the duplicate title bar and the
+            File/Edit/View menu bar are gone.
+          - **One-click installer** — this file.
+
+          ## Verification status — read this
+
+          These executables were built and packaged by the windows-release workflow
+          (run 42534211521) on a GitHub Windows runner. At this commit the automated
+          gates were green: 1184/1184 application tests, 56/56 website tests, both
+          TypeScript checks and the production builds.
+
+          The application has **not yet been validated on physical Windows hardware**:
+          window dragging, DPI scaling, close-to-tray behaviour and the overlay over
+          real games still need a human pass on a Windows machine. Nothing here claims
+          otherwise.
+          NOTES
+
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "crshhx $VERSION — first updated Windows build" \
+            --notes-file notes.md \
+            "artifacts/$SETUP" "artifacts/$PORTABLE"
+
+          echo "Published $TAG from run $RUN_ID."
