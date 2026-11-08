@@ -25,12 +25,21 @@ npm run build            # vite build (renderer) + tsc (main process)
 
 ## Current results
 
-**1024 tests, 20 files, all passing** (`Test Files 20 passed (20)`, `Tests 1024 passed (1024)`).
+**1061 tests, 20 files, all passing** (`Test Files 20 passed (20)`, `Tests 1061 passed (1061)`).
 Run on Linux (x64), Node 20, in a sandbox without an Electron binary and without a display
 server. Nothing was skipped. One test was deliberately **rewritten** — `exportPresets` used
 to be asserted to normalise values on the way out, and that behaviour was reversed for a
 reason recorded as defect #19 below; the test now asserts the new contract and says why.
-No other existing test was removed or weakened.
+Five more were **replaced** when the migration stopped evaluating generated JavaScript: the
+tests that `eval`'d `dumpScript`/`injectScript` now execute the real probe preload through a
+stubbed IPC channel against the same real `localStorage`, which is strictly stronger — the
+code under test is the code that ships. No other existing test was removed or weakened.
+
+The same commit was also verified on GitHub's own runners: the `quality` job of
+`windows-release.yml` ran green for pull request #1 (run 42496448453, 44 s, `npm ci` →
+1061 tests → both typechecks → production build), so the suite is not only passing in this
+sandbox. The Windows `package` job was **skipped** for that pull request by design and has
+still never run anywhere.
 
 | File | Tests | Covers |
 | --- | --- | --- |
@@ -43,8 +52,8 @@ No other existing test was removed or weakened.
 | `weaponSlots.persistence.test.ts` | 49 | Serialisation, migration, normalisation idempotency, existing-keys preservation |
 | `weaponSlots.integration.test.ts` | 75 | End-to-end through the real service: transport → policy → overlay channel → status |
 | `weaponSlots.ui.test.tsx` | 152 | Real React components in jsdom: table, recorder, picker, **profile bar / game associations**, indicator, Keybinds page, IPC-robustness, write-isolation |
-| `buildLayout.test.ts` | 27 | Build-layout integrity, production renderer loading, packaging configuration guards, storage-key completeness, native-dependency safety |
-| `productionRuntime.test.ts` | 31 | The `app://crshhx` asset resolver and its traversal guard, content types, the CSP in both modes, and the storage-migration scripts **executed against a real localStorage** |
+| `buildLayout.test.ts` | 41 | Build-layout integrity, production renderer loading, packaging configuration guards, storage-key completeness, native-dependency safety, the **single marker write site**, the absence of any `executeJavaScript` call, and the release workflow's triggers and permissions |
+| `productionRuntime.test.ts` | 54 | The `app://crshhx` asset resolver and its traversal guard, content types, the CSP in both modes, the **probe preload executed against a real localStorage**, every branch of `decideMigration`, and `settleProbe` for success, rejection, timeout and timer cleanup |
 | `crosshairSchema.test.ts` | 45 | Schema v2 normalisation, idempotency, clamping and repairs, arm geometry, rotation/scale resolution, tolerance of junk input |
 | `colorUtils.test.ts` | 58 | Colour parsing and canonicalisation, contrast ratios and verdicts, readable text colour, compositing, colour naming, swatch push |
 | `configDiff.test.ts` | 15 | A/B difference rows, grouping, ignored identity fields, asymmetric-vs-symmetric equivalence |
@@ -293,11 +302,25 @@ No other existing test was removed or weakened.
   asserts development *is* laxer, so nobody "fixes" Vite by tightening dev.
 - `style-src 'unsafe-inline'` is asserted with a comment, because it looks like a
   weakness and is in fact required by React inline style attributes.
-- The storage-migration scripts are **run**, not just parsed: `dumpScript` against
-  a primed `localStorage` returns exactly crshhx's keys and no foreign ones;
-  `injectScript` writes only absent keys and reports which; both degrade to
-  `{}` / `[]` when storage throws. A 200 KB value containing quotes, newlines and
-  a literal `</script>` round-trips intact.
+- The probe preload is **executed**, not just parsed: it is imported with
+  `electron` stubbed and its IPC listener is driven against a primed
+  `localStorage`. A dump returns exactly crshhx's keys and no foreign ones; a
+  write stores only absent keys and reports which; an origin that throws on read
+  answers with an `error` rather than an empty result, and a refused write does
+  the same instead of claiming it copied nothing. A 200 KB value containing
+  quotes, newlines and a literal `</script>` round-trips intact, and an unknown
+  operation is answered with an error rather than silence.
+- Every branch of `decideMigration`, the only thing that may authorise the
+  completion marker: keys copied, **nothing to copy** (defect #21), the current
+  origin already superseded the old one, the source probe timed out, the
+  destination probe threw, the probe document reported an error, the copy never
+  confirmed, and a destination that moved mid-copy. `settleProbe` is covered for
+  success, rejection and timeout, and is asserted to clear its timer either way —
+  a timer left pending behind startup is the kind of thing nobody notices.
+- The release workflow is read as data: it builds on a Windows runner, gates
+  packaging behind the quality job, gives a pull request the gate but not the
+  Windows job, reports SHA-256 hashes, fails if no executable was produced, signs
+  and publishes nothing, and asks for `contents: read` and no write scope.
 - Planning rules: copy only what the destination lacks, never overwrite, no-op for
   a fresh install, and `crshhx_theme_accent` — the key most likely to be forgotten
   — is pinned by name.
@@ -313,13 +336,16 @@ No other existing test was removed or weakened.
 
 ## Bugs found by the tests
 
-**Twenty** real defects were caught and fixed during development. They are recorded here
+**Twenty-one** real defects were caught and fixed during development. They are recorded here
 because every one of them would have shipped. #6, #10 and #11 were found by the jsdom
 component suite — that is, by executing the React layer for the first time — which is why
 it exists. #12–#20 came from the editor and preset work; #18 and #20 were found by tests
-written against the UI rather than the library, which is the same lesson again.
+written against the UI rather than the library, which is the same lesson again. #21 was
+found by **reviewing the branch**, not by any test — and a static assertion in this very
+suite had looked straight at it and passed, which is its own lesson: asserting that a string
+appears somewhere in a file says nothing about whether the line containing it is reachable.
 
-**Read the implementation before asserting its contract.** Of the twenty, five were the
+**Read the implementation before asserting its contract.** Of the twenty-one, five were the
 *test* being wrong rather than the code (#14's cousins, the `allocateId` renumbering
 expectations, the `searchViews` one-character-query case, the `add`-vs-`add-with-new-id`
 count, and a helper that silently dropped its third argument). A failing assertion is a
@@ -347,6 +373,7 @@ question, not a verdict: decide which side is wrong before changing either.
 | 18 | `allocateId` walked replacement ids against the ids claimed *so far* in a file, not against every id the file would want. | Entry 1 colliding with a local id could be renumbered onto the id entry 2 legitimately wanted; entry 2 was then reported as an in-file duplicate and **skipped**. An import silently lost a crosshair the user never chose to lose, and the preview said "skipped" as though it were expected. Every id in the file is now reserved before any allocation, with a separate set doing the genuine-duplicate check. |
 | 19 | `buildEnvelope` normalised crosshair values **on the way out**, so an out-of-range local value was repaired on export and again on import. | The exported file silently disagreed with the user's own library, and because the importer saw a clean value it reported **no** repair — the correction was invisible to everyone. Export now writes values as the user has them and the importer is the single validator. An existing test asserted the old behaviour and was rewritten. |
 | 20 | Favourites had **two stores**: the vault read and wrote `crshhx_favorites` while the preset manager used `library.entries[id].favourite`. | Starring a crosshair in the vault did not make it a favourite in the manager, and the manager's next write silently un-starred it. Both views disagreed about the same idea, with no error anywhere. `loadFavoriteIds`/`saveFavoriteIds`/`toggleFavoriteId` now read and write the sidecar, the legacy key is migrated on first read and then deleted, and App re-reads the library on every view change. |
+| 21 | `migrateStorageOrigin` wrote its completion marker only on the branch that copied keys; the empty-plan branch `return`ed before reaching it. | No distributed build ever used the `file://` origin, so *every* install hits the empty branch — meaning **every launch** rebuilt a hidden window, wrote a temp file and probed two origins before the overlay could appear, forever, and the docs claimed the opposite. Found in review, not by a test: the existing static assertion checked that `markerContents` appeared in the function body, which it did, on a line the empty path never reached. `decideMigration()` is now the only decision point, there is exactly one guarded marker write site, and both facts are pinned. |
 
 ---
 
@@ -393,8 +420,8 @@ tested, but unverified on real hardware**. Do not treat any of it as confirmed w
 | The favourites migration on a **real** user profile with an existing `crshhx_favorites` list | Medium — exercised with fixtures written directly to `localStorage`, not with a profile produced by an older build | No pre-existing user data |
 | **The packaged application has never been launched** — no `.exe`, no installer, not even an unpacked app directory | **High** — everything in the packaging phase is configuration plus unit tests | The sandbox can reach `github.com` but not the release-asset CDN that serves the NSIS and code-sign toolchains; 36 consecutive download attempts failed |
 | The `app://crshhx` protocol handler executing inside Electron (`protocol.handle`, `net.fetch` through the asar, the `fs` fallback) | **High** — the resolver logic is unit tested against the real built bundle, but the Electron wiring has never run | No Electron binary in the sandbox |
-| The storage migration running against a genuine `file://` profile | **High** — rests on Chromium keying `file://` localStorage to the scheme rather than the full path; if wrong it degrades to a fresh install rather than to data loss | Cannot launch Electron here |
-| The Content Security Policy as observed by a real renderer, including whether the export download (`blob:` anchor) and the migration's `executeJavaScript` behave as expected under it | Medium | No Electron binary |
+| The storage migration running against a genuine `file://` profile, and the probe preload answering over IPC from inside a sandboxed hidden window | **High** — rests on Chromium keying `file://` localStorage to the scheme rather than the full path, and on a sandboxed preload reaching `localStorage` on both origins. If either is wrong it degrades to a fresh install, or to a retried migration, rather than to data loss. The first launch logs the origins the probe answered from, which is the check | Cannot launch Electron here |
+| The Content Security Policy as observed by a real renderer: whether the export download (`blob:` anchor) works under it, and **whether `onHeadersReceived` is invoked at all for responses served by `protocol.handle`** | **High** for the second half — if that listener never fires for `app://`, the policy is inert for the production windows and must be delivered as a `<meta>` tag instead. Electron's typings do not say either way. The migration no longer depends on the answer | No Electron binary |
 | Executable icon and version stamping (`rcedit`) | Low — a Linux-built Windows target cannot run it; the installer chrome still carries the icon | Requires Windows or Wine |
 | The NSIS installer and the portable exe actually installing, launching, and keeping data after the portable exe is moved | **High** — the whole point of the packaging work | Artifacts could not be produced here |
 
@@ -503,3 +530,16 @@ them pass.
 - [ ] An existing installation with saved presets, settings and a current crosshair keeps
       all of them after upgrading.
 - [ ] Any repairs made on load are listed on the Weapon Slots page.
+- [ ] *Packaged build, first launch:* the log carries
+      `[crshhx] storage probe answered from <origin> and <origin>` with two real origins —
+      `null` for the legacy `file://` document and `app://crshhx` for the new one.
+      `undefined` means a probe never answered: nothing was touched, and the next launch
+      retries.
+- [ ] *Packaged build, second launch:* the log says the migration was skipped, and
+      `%APPDATA%\Crshhx Crosshair Studio\storage-migration-v1.done` exists with a `report`
+      worth quoting in a support request. This is defect #21's check — the marker must
+      appear **even when there was nothing to migrate**, which is the normal case.
+- [ ] *Packaged build:* DevTools → Network → `index.html` shows a
+      `Content-Security-Policy` response header on the `app://crshhx` document. If it is
+      absent, `onHeadersReceived` is not invoked for `protocol.handle` responses and the
+      policy is inert for the production windows — see `docs/packaging.md`.
