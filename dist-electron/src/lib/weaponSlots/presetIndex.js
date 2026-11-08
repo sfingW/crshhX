@@ -112,6 +112,7 @@ function projectIndex(index, state) {
 function listSelectablePresets(index) {
     const groups = [
         ['Saved (Custom)', (id) => id.startsWith('custom-')],
+        ['Pro Crosshairs', (id) => id.startsWith('pc-')],
         ['Built-in Pro', (id) => id.startsWith('preset-')],
         ['Pro Roster', (id) => id.startsWith('pro-')],
         ['Precision Dots', (id) => id.startsWith('dot-')],

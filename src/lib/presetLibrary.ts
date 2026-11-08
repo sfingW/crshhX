@@ -1,5 +1,6 @@
 import { PRO_PRESETS } from './defaultPresets';
 import { COMPLETE_CROSSHAIR_VAULT } from './crosshairCollection';
+import { PRO_CROSSHAIRS } from './proCrosshairs';
 import { buildPresetIndex, projectIndex } from './weaponSlots/presetIndex';
 import { reservedBindingsFromSettings } from './weaponSlots/migration';
 import type { AppSettings, CrosshairConfig } from '../types/crosshair';
@@ -22,7 +23,7 @@ import type {
  */
 
 export function getPresetIndex(customPresets: readonly CrosshairConfig[] = []): PresetIndex {
-  return buildPresetIndex([COMPLETE_CROSSHAIR_VAULT, PRO_PRESETS, customPresets]);
+  return buildPresetIndex([COMPLETE_CROSSHAIR_VAULT, PRO_PRESETS, PRO_CROSSHAIRS, customPresets]);
 }
 
 /**

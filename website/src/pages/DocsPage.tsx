@@ -138,11 +138,11 @@ export function DocsPage() {
               </Callout>
               <h3>Installer build</h3>
               <p>
-                A guided NSIS setup. You pick the install directory and a Start menu shortcut is
-                created. Your library is written to your roaming application-data directory
-                rather than the install directory, so reinstalling, moving or upgrading the
-                application never disturbs your data. Uninstalling removes the application and
-                leaves your data behind.
+                A one-click NSIS setup: double-click the downloaded file and it installs with no
+                prompts, creating desktop and Start menu shortcuts. Your library is written to
+                your roaming application-data directory rather than the install directory, so
+                reinstalling, moving or upgrading the application never disturbs your data.
+                Uninstalling removes the application and leaves your data behind.
               </p>
               <h3>Portable build</h3>
               <p>

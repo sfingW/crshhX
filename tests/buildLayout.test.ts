@@ -428,3 +428,67 @@ describe('packaging: the Windows release workflow is the sanctioned path', () =>
 function builderYmlSource(): string {
   return readFileSync(join(ROOT, 'electron-builder.yml'), 'utf8');
 }
+
+describe('background mode + target monitor: main-process wiring', () => {
+  const builder = builderYmlSource();
+
+  it('ships the tray icon as a real file, matching the resolver', () => {
+    // resolveTrayIconPath (unit-tested in tests/backgroundMode.test.ts) looks
+    // for exactly these names in exactly these places; the packaging config is
+    // the other half of that contract.
+    expect(builder).toContain('extraResources:');
+    expect(builder).toContain('from: build/icon.ico');
+    expect(builder).toContain('to: icon.ico');
+    expect(builder).toContain('from: build/icon.png');
+    expect(builder).toContain('to: icon.png');
+  });
+
+  it('takes the single-instance lock and restores the window on a second launch', () => {
+    expect(mainSource).toContain('requestSingleInstanceLock()');
+    expect(mainSource).toContain("app.on('second-instance'");
+    expect(mainSource).toContain('handleSecondInstance()');
+  });
+
+  it('intercepts the studio close instead of quitting unconditionally', () => {
+    expect(mainSource).toContain("studioWindow.on('close'");
+    expect(mainSource).toContain('handleStudioClose(event)');
+    // The old behaviour — closing the studio always exited the app — must not
+    // come back outside the guarded path.
+    expect(mainSource).not.toContain('we can keep overlay running or close if user quits');
+  });
+
+  it('observes display events before any window exists and repositions on them', () => {
+    const monitor = mainSource.indexOf('createDisplayMonitor(screen');
+    const overlay = mainSource.indexOf('createOverlayWindow();');
+    expect(monitor).toBeGreaterThan(-1);
+    expect(overlay).toBeGreaterThan(monitor);
+    expect(mainSource).toContain('positionOverlayWindow();');
+    expect(mainSource).toContain("send('displays-changed'");
+  });
+
+  it('answers displays:list from the live display service', () => {
+    expect(mainSource).toContain("ipcMain.handle('displays:list'");
+    expect(mainSource).toContain('displayMonitor?.list()');
+  });
+
+  it('has exactly one owner of overlay visibility', () => {
+    // The hotkey, the toggle IPC, the settings push and the tray menu all go
+    // through setOverlayVisible; a second show/hide path is how the tray menu
+    // and the overlay start disagreeing.
+    const shows = mainSource.match(/showInactive\(\)/g) ?? [];
+    expect(shows).toHaveLength(1);
+    expect(mainSource).toContain('function setOverlayVisible(visible: boolean)');
+    expect(mainSource).toContain('setOverlayVisible(!isOverlayVisible)');
+    expect(mainSource).toContain('trayController?.sync()');
+  });
+
+  it('tears the tray and display listeners down on the way out', () => {
+    expect(mainSource).toContain("app.on('before-quit'");
+    expect(mainSource).toContain('handleBeforeQuit()');
+    const willQuit = mainSource.indexOf("app.on('will-quit'");
+    const trayDestroy = mainSource.indexOf('trayController?.destroy()', willQuit);
+    const monitorDispose = mainSource.indexOf('displayMonitor?.dispose()', willQuit);
+    expect(trayDestroy).toBeGreaterThan(willQuit);
+    expect(monitorDispose).toBeGreaterThan(willQuit);
+  });
+});

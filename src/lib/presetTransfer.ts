@@ -320,6 +320,7 @@ const SETTING_LABELS: Record<keyof AppSettings, string> = {
   selectedMonitor: 'Selected monitor',
   runAtStartup: 'Start with Windows',
   suspendedWhenMinimized: 'Suspend while minimised',
+  keepOverlaysOnClose: 'Keep overlays running when the window is closed',
 };
 
 function describe(value: unknown): string {

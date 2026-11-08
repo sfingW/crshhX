@@ -387,7 +387,13 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   toggleOverlayHotkey: 'F10',
   cyclePresetHotkey: 'F9',
   centerLockHotkey: 'F8',
-  selectedMonitor: 0,
+  // Automatic: follow the Windows primary display. -1 is AUTO_MONITOR from
+  // src/lib/monitors.ts; the constant is not imported here to keep this module
+  // dependency-free, and tests/monitorTargets.test.ts pins the two together.
+  selectedMonitor: -1,
   runAtStartup: false,
   suspendedWhenMinimized: true,
+  // Close-to-tray is on by default: closing the studio hides it and keeps the
+  // overlays running. Quit is explicit, from the tray menu.
+  keepOverlaysOnClose: true,
 };

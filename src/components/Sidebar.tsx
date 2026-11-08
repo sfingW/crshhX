@@ -2,11 +2,13 @@ import React from 'react';
 import {
   Crosshair,
   FolderOpen,
+  GraduationCap,
   Sliders,
   Move,
   Keyboard,
   ShieldCheck,
   Star,
+  Trophy,
   Zap,
 } from 'lucide-react';
 
@@ -14,10 +16,12 @@ export type ActiveNavView =
   | 'vault'
   | 'favorites'
   | 'library'
+  | 'procrosshairs'
   | 'designer'
   | 'calibration'
   | 'keybinds'
   | 'weaponslots'
+  | 'academy'
   | 'system';
 
 interface SidebarProps {
@@ -28,9 +32,10 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ activeView, onSelectView }) => {
   return (
     <aside className="w-56 bg-surface-sidebar border-r border-surface-border flex flex-col justify-between shrink-0 select-none text-zinc-300">
-      {/* Brand Header */}
+      {/* Brand Header — the frameless window's top-left drag region. It holds
+          no interactive elements, so the whole strip can move the window. */}
       <div>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-surface-border">
+        <div className="titlebar-drag flex items-center justify-between px-5 py-4 border-b border-surface-border">
           <div className="flex items-center gap-2">
             <span className="font-extrabold text-zinc-100 text-sm font-mono tracking-tight">
               CRSHHX
@@ -99,6 +104,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onSelectView }) =>
             >
               <FolderOpen className="w-4 h-4" />
               <span>Preset Manager</span>
+            </button>
+
+            <button
+              onClick={() => onSelectView('procrosshairs')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-md font-medium transition-all ${
+                activeView === 'procrosshairs'
+                  ? 'bg-surface-card font-semibold'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-surface-cardHover'
+              }`}
+              style={{
+                color: activeView === 'procrosshairs' ? 'var(--brand-accent)' : undefined,
+              }}
+            >
+              <Trophy className="w-4 h-4" />
+              <span>Pro Crosshairs</span>
             </button>
           </div>
 
@@ -171,6 +191,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onSelectView }) =>
             >
               <Zap className="w-4 h-4" />
               <span>Weapon Slots</span>
+            </button>
+          </div>
+
+          {/* Learn Section */}
+          <div className="space-y-1">
+            <span className="px-3 text-[10px] uppercase font-mono tracking-wider text-zinc-500 font-semibold block">
+              Learn
+            </span>
+            <button
+              onClick={() => onSelectView('academy')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-md font-medium transition-all ${
+                activeView === 'academy'
+                  ? 'bg-surface-card font-semibold'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-surface-cardHover'
+              }`}
+              style={{
+                color: activeView === 'academy' ? 'var(--brand-accent)' : undefined,
+              }}
+            >
+              <GraduationCap className="w-4 h-4" />
+              <span>Crosshair Academy</span>
             </button>
           </div>
 

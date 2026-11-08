@@ -44,6 +44,8 @@ export const MIGRATED_STORAGE_KEYS: readonly string[] = [
   'crshhx_favorites',
   'crshhx_preset_library',
   'crshhx_theme_accent',
+  /** Crosshair Academy completion ticks — small, but it is the user's data. */
+  'crshhx_academy_progress',
   WEAPON_SLOTS_STORAGE_KEY,
   WEAPON_SLOTS_RUNTIME_KEY,
 ];

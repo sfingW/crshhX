@@ -124,7 +124,20 @@ export interface AppSettings {
   toggleOverlayHotkey: string; // e.g. 'F10'
   cyclePresetHotkey: string;   // e.g. 'F9'
   centerLockHotkey: string;    // e.g. 'F8'
+  /**
+   * Which display the overlay targets. `-1` (AUTO_MONITOR, see
+   * `src/lib/monitors.ts`) follows the OS primary display; any other value is
+   * an Electron display id. An id that is no longer connected resolves to the
+   * primary display until the monitor returns — the stored preference survives.
+   */
   selectedMonitor: number;
   runAtStartup: boolean;
   suspendedWhenMinimized: boolean;
+  /**
+   * Close-to-tray: when true (the default), clicking the studio window's X
+   * hides the window instead of exiting, and overlays, global hotkeys and
+   * weapon-slot switching keep running from the system tray. When false,
+   * closing the window performs a normal application exit.
+   */
+  keepOverlaysOnClose: boolean;
 }

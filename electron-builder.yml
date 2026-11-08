@@ -33,6 +33,17 @@ files:
   - '!**/node_modules/uiohook-napi/prebuilds/win32-arm64/**'
   - '!**/node_modules/uiohook-napi/prebuilds/win32-ia32/**'
 
+# The system tray icon must be a real file on disk at runtime — the icon
+# embedded in the .exe cannot be read back by Electron. These land in the
+# resources directory next to the executable; `resolveTrayIconPath` in
+# electron/services/trayService.ts resolves exactly these two destinations and
+# tests/backgroundMode.test.ts pins the pair together.
+extraResources:
+  - from: build/icon.ico
+    to: icon.ico
+  - from: build/icon.png
+    to: icon.png
+
 # Production node_modules are added by electron-builder automatically; the only
 # one this app requires at runtime is uiohook-napi (see below).
 asar: true
@@ -60,15 +71,18 @@ win:
         - x64
 
 nsis:
-  # A guided installer rather than a silent one-click: the user chooses where it
-  # goes, which matters because the app stores data OUTSIDE the install directory
-  # (see electron/main.ts) and people need to understand that.
-  oneClick: false
+  # One-click installer: double-click, it installs, it launches — the flow
+  # people expect from every other app. The earlier guided wizard (directory
+  # chooser) was dropped at user request; the fact that user data lives OUTSIDE
+  # the install directory (see electron/main.ts) is explained on the website's
+  # download page and in docs/packaging.md instead of in the installer.
+  oneClick: true
   perMachine: false
-  allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Crshhx Crosshair Studio
+  # Predictable, URL-safe filename so download links never contain spaces.
+  artifactName: crshhx-crosshair-studio-setup-${version}.exe
   # Uninstalling the application must not destroy the user's crosshair library,
   # folders, settings and weapon-slot profiles, which live under the roaming
   # application-data directory. This is false by default and is pinned by a test
