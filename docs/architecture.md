@@ -82,6 +82,11 @@ DOM types: `ActiveSlotInfo`, `WeaponSlotStatus` and `WeaponSlotSwitchedPayload` 
 `src/lib/weaponSlots/types.ts` even though they are renderer-facing, so the main process
 can produce them without a DOM dependency.
 
+> **Scope.** This document describes the overlay, the input transports, foreground
+> tracking and weapon-slot switching. The crosshair schema, the designer editor, the
+> preset-organisation sidecar and the import/export file format are documented
+> separately in [`preset-system.md`](preset-system.md).
+
 ## Module map
 
 ### `src/lib/weaponSlots/` — pure core (no Electron, no DOM, no React)
