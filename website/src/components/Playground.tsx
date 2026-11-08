@@ -101,7 +101,7 @@ export function Playground() {
     <figure className="hud pg">
       <div className="pg-head">
         <span>crosshair playground</span>
-        <span className="pg-live">live</span>
+        <span className="pg-mode">interactive</span>
       </div>
 
       <div
@@ -110,7 +110,6 @@ export function Playground() {
         onPointerMove={onPointerMove}
         onPointerLeave={onPointerLeave}
       >
-        <span className="scan" aria-hidden="true" />
         <div className="pg-reticle">
           <Reticle
             spec={{

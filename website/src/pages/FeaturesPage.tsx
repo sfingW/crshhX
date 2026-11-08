@@ -112,7 +112,7 @@ interface Section {
   eyebrow: string;
   title: string;
   body: string;
-  points: ReadonlyArray<[string, string]>;
+  points: ReadonlyArray<string>;
   visual: ReactNode;
 }
 
@@ -120,72 +120,72 @@ const SECTIONS: ReadonlyArray<Section> = [
   {
     tab: 'Editor',
     eyebrow: '01 · Editor',
-    title: 'A crosshair editor with real geometry',
-    body: 'The editor works on the same schema the overlay renders: arm lengths and thickness per direction, gap, whole-reticle rotation and scale, an outline drawn behind each element and an inner outline drawn inside it. Colours come with contrast verdicts, because a reticle you cannot see is a defect, not a preference.',
+    title: 'Crosshair editor',
+    body: 'The editor works on the overlay’s own schema, so what you see is what gets drawn: per-arm length and thickness, gap, rotation, scale, outer and inner outlines, centre dot, spread ring and glow.',
     points: [
-      ['Undo that means undo.', 'A coalesced history over the whole config, so a slider drag is one step, not forty.'],
-      ['A/B compare.', 'Hold a snapshot and diff it against your working copy, parameter by parameter.'],
-      ['Live preview.', 'Every control updates the reticle immediately, on a target backdrop, at true proportion.'],
+      'Undo history coalesces continuous adjustments, so a slider drag is one step.',
+      'The compare panel diffs a held snapshot against the working copy, parameter by parameter.',
+      'Colour tools report contrast against the target backdrop while you pick.',
     ],
     visual: <DesignerMock />,
   },
   {
     tab: 'Preset library',
     eyebrow: '02 · Presets',
-    title: 'A library, not a list',
-    body: '258 built-in presets across Valorant, CS2, Fortnite and Apex, plus everything you make. Folders, favourites, descriptions and timestamps live in a sidecar keyed by preset id, so organising a built-in never modifies it and your own presets stay byte-compatible with weapon slots.',
+    title: 'Presets and library',
+    body: '258 built-in presets across Valorant, CS2, Fortnite and Apex, plus everything you save. Folders, favourites, descriptions and timestamps live in a sidecar keyed by preset id, so organising a built-in never modifies it.',
     points: [
-      ['Search and sort.', 'By name, game, recency or favourite, with counts that stay correct as the library changes.'],
-      ['Protected built-ins.', 'Shipped presets cannot be overwritten or deleted by an import or an edit.'],
-      ['One favourites store.', 'Starring a crosshair anywhere stars it everywhere; the legacy key is migrated on first read.'],
+      'Search and sort by name, game, recency or favourite, with counts that stay correct.',
+      'Shipped presets cannot be overwritten or deleted, by edits or by imports.',
+      'Favourites are a single store; the legacy key is migrated on first read.',
     ],
     visual: <LibraryMock />,
   },
   {
     tab: 'Import & export',
     eyebrow: '03 · Transfer',
-    title: 'Import and export with a preview gate',
-    body: 'Exports are a versioned transfer file that carries your values exactly as they are. Imports are planned before they are applied: you see every entry, every conflict and every repair, and choose per entry whether to keep yours, replace it or skip.',
+    title: 'Import and export',
+    body: 'Export writes a versioned transfer file with your values as they are. Import plans before it applies: entries, conflicts and repairs are listed first, and each entry is kept, replaced or skipped by your choice.',
     points: [
-      ['Nothing overwritten by default.', 'A conflicting entry is kept unless you explicitly set it to replace yours.'],
-      ['Large imports ask twice.', 'More than 25 crosshairs requires an explicit acknowledgement before anything is written.'],
-      ['Repairs are reported.', 'Out-of-range values are normalised on the way in and listed, never silently changed on the way out.'],
+      'Conflicts default to keeping your preset; replace is an explicit per-entry choice.',
+      'Imports above 25 crosshairs require an acknowledgement before anything is written.',
+      'Out-of-range values are normalised on the way in and listed in the preview.',
     ],
     visual: <ImportPreviewMock />,
   },
   {
     tab: 'Game profiles',
     eyebrow: '04 · Profiles',
-    title: 'Profiles per game',
-    body: 'Crosshairs are tagged for a game or marked universal. A profile can switch automatically when its game comes to the foreground, and can be restricted so switching only happens while a matched process is in front.',
+    title: 'Game profiles',
+    body: 'Crosshairs carry a game tag or a universal one. A profile can switch automatically when its game reaches the foreground, and can be restricted to switch only while a matched process is in front.',
     points: [
-      ['Foreground auto-select.', 'Optional; with it off, no process polling runs at all.'],
-      ['Fail-closed restriction.', 'If process tracking is unavailable, a restricted profile stops switching rather than firing in the wrong game.'],
-      ['Manual always wins.', 'Selecting a profile by hand overrides auto-selection until the game changes again.'],
+      'Automatic switching is optional; with it off, no process polling runs at all.',
+      'Restricted profiles stop switching if process tracking becomes unavailable.',
+      'Selecting a profile by hand overrides auto-selection until the game changes again.',
     ],
     visual: <ProfilesMock />,
   },
   {
     tab: 'Weapon slots',
     eyebrow: '05 · Weapon slots',
-    title: 'Switching that keeps up with the fight',
-    body: 'Bind a crosshair to each weapon slot and record the key that selects it. The passive input hook observes your keyboard without consuming a single event, so the game sees exactly what it would have seen without crshhx.',
+    title: 'Weapon-slot switching',
+    body: 'Each slot holds a crosshair and a recorded key. The passive hook observes the keyboard without consuming a single event, so the game sees exactly what it would see without crshhx.',
     points: [
-      ['Defaults that make sense.', 'Shotgun on 1, rifle on 2, SMG on 3, sniper on 4, utility on 5 — all rebindable.'],
-      ['Conflict detection.', 'Assigning a key another slot already uses is refused, naming the slot in question.'],
-      ['Visible degradation.', 'If the hook cannot start, the interface says so and explains the fallback transport.'],
+      'Defaults: shotgun on 1, rifle on 2, SMG on 3, sniper on 4, utility on 5. All rebindable.',
+      'A key already used by another slot is refused, and the conflict is named.',
+      'If the hook cannot start, the page states the reason and explains the fallback transport.',
     ],
     visual: <SlotsMock />,
   },
   {
     tab: 'Overlay',
     eyebrow: '06 · Overlay',
-    title: 'An overlay built to be forgotten',
-    body: 'A dedicated topmost window, centred on the monitor you choose, drawing nothing but the reticle. It compensates for stretched resolutions, morphs when you aim down sights and expands with firing bloom if you want it to.',
+    title: 'Overlay window',
+    body: 'A dedicated topmost window, centred on the monitor you choose, drawing nothing but the reticle.',
     points: [
-      ['F10 and F9.', 'Toggle the overlay and cycle presets without leaving the game.'],
-      ['Stretched compensation.', '4:3, 16:10, 5:4 or a custom ratio, so the reticle stays square on stretched setups.'],
-      ['ADS and bloom.', 'Shrink, dot-only or fade on aim; configurable expansion and decay on fire.'],
+      'F10 toggles the overlay and F9 cycles presets without leaving the game.',
+      'Stretched compensation for 4:3, 16:10, 5:4 and custom ratios keeps the reticle square.',
+      'ADS morphing (shrink, dot-only, fade) and firing bloom with configurable decay.',
     ],
     visual: (
       <>
@@ -225,7 +225,7 @@ export function FeaturesPage() {
             level={1}
             eyebrow="Features"
             title="What the application actually does"
-            lead="Six areas, described the way the product behaves. Pick a panel to explore it. Every visual on this page is an illustrative rendering built from the application's real parameters; none of them is a screenshot."
+            lead="Six areas of the application, described as they behave. Every visual on this page is rendered from the application's real parameters; none of them is a screenshot."
           />
         </div>
       </section>
@@ -266,10 +266,8 @@ export function FeaturesPage() {
                 <h2>{section.title}</h2>
                 <p style={{ marginTop: 16, color: 'var(--text-dim)' }}>{section.body}</p>
                 <ul className="feature-list">
-                  {section.points.map(([strong, rest]) => (
-                    <li key={strong}>
-                      <strong>{strong}</strong> {rest}
-                    </li>
+                  {section.points.map((point) => (
+                    <li key={point}>{point}</li>
                   ))}
                 </ul>
                 <div className="feature-visual">

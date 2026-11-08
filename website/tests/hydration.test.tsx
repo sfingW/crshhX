@@ -72,19 +72,18 @@ describe('hydration', () => {
     expect(container.querySelectorAll('h1')).toHaveLength(1);
 
     expect(headline?.textContent).toBe('Your crosshair, exactly where you put it.');
-    expect(headline?.querySelector('em')?.textContent).toBe('exactly');
 
     // React must reuse the server markup rather than throw it away, so the
     // hydrated tree has the same elements the prerender produced.
-    const prerenderedCards = (prerendered.match(/class="card"/g) ?? []).length;
-    expect(container.querySelectorAll('.card').length).toBe(prerenderedCards);
-    expect(prerenderedCards).toBeGreaterThan(5);
+    const prerenderedRows = (prerendered.match(/class="spec-row"/g) ?? []).length;
+    expect(container.querySelectorAll('.spec-row').length).toBe(prerenderedRows);
+    expect(prerenderedRows).toBe(6);
     const prerenderedSvgs = (prerendered.match(/<svg/g) ?? []).length;
     expect(container.querySelectorAll('svg').length).toBe(prerenderedSvgs);
 
     expect(container.querySelector('.nav')).not.toBeNull();
     expect(container.querySelector('.footer')).not.toBeNull();
-    expect(container.querySelectorAll('.reveal').length).toBeGreaterThan(4);
+    expect(container.querySelectorAll('.reveal').length).toBeGreaterThanOrEqual(2);
     expect(document.title).toBe(routeFor('/')?.title);
   });
 

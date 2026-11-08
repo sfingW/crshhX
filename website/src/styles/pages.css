@@ -35,10 +35,6 @@
   line-height: 1.04;
 }
 
-.hero-title em {
-  font-style: normal;
-  color: var(--brand);
-}
 
 .hero-sub {
   margin-top: var(--space-5);
@@ -107,7 +103,7 @@
   font-family: var(--font-mono);
   font-size: 0.6875rem;
   letter-spacing: 0.16em;
-  color: var(--brand);
+  color: var(--text-faint);
 }
 
 .step-title {
@@ -247,9 +243,7 @@
   position: relative;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-l);
-  background:
-    radial-gradient(90% 120% at 50% 0%, rgba(111, 217, 192, 0.08), transparent 60%),
-    var(--ink-1);
+  background: var(--ink-1);
   padding: clamp(48px, 7vw, 88px) clamp(24px, 5vw, 72px);
   text-align: center;
   overflow: hidden;
@@ -652,39 +646,121 @@
   font-size: 1.125rem;
 }
 
-.nav-progress {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -1px;
-  height: 1px;
-  background: var(--grad-accent);
-  transform: scaleX(0);
-  transform-origin: 0 50%;
-}
 
-.strip-section {
-  padding-block: var(--space-7);
-}
 
 .explorer-section {
   padding-top: var(--space-6);
 }
 
-.nf-stage {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 190px;
-  height: 190px;
-  margin-inline: auto;
+
+/* ------------------------------------------------------------------ *
+ * Restraint pass: quieter hierarchy, hairline structure
+ * ------------------------------------------------------------------ */
+
+.hero-title {
+  font-size: clamp(2.25rem, 4.2vw, 3.25rem);
 }
 
-.nf-tag {
-  margin-top: var(--space-4);
+.hero-sub {
+  font-size: 1.0625rem;
+}
+
+.hero-meta {
+  color: var(--text-faint);
+}
+
+.eyebrow {
+  color: var(--text-faint);
+  letter-spacing: 0.12em;
+}
+
+.section-title {
+  font-size: clamp(1.6rem, 2.8vw, 2.15rem);
+}
+
+/* One quiet fact row instead of a numbers billboard. */
+.factline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+  border-block: 1px solid var(--line);
+  padding: 12px 0;
   font-family: var(--font-mono);
   font-size: 0.75rem;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+
+/* Spec index: hairline rows instead of icon cards. */
+.spec-index {
+  border-top: 1px solid var(--line);
+  margin-top: var(--space-6);
+}
+
+.spec-row {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: var(--space-5);
+  padding: var(--space-5) 0;
+  border-bottom: 1px solid var(--line);
+  align-items: baseline;
+}
+
+.spec-name {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  letter-spacing: 0.06em;
+  color: var(--text);
+}
+
+.spec-name::before {
+  content: attr(data-index);
+  margin-right: 14px;
+  color: var(--text-faint);
+}
+
+.spec-desc {
+  color: var(--text-dim);
+  font-size: 0.96875rem;
+}
+
+@media (max-width: 720px) {
+  .spec-row {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+}
+
+/* Steps as quiet columns with a top rule. */
+.step {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-5);
+}
+
+/* Closing panel: left aligned and flat. */
+.cta-band {
+  text-align: left;
+  padding: clamp(32px, 5vw, 56px);
+}
+
+.cta-band p {
+  max-width: 62ch;
+}
+
+.cta-actions {
+  justify-content: flex-start;
+}
+
+/* Playground header label, calm. */
+.pg-mode {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-faint);
+}
+
+/* Feature bullets: neutral markers. */
+.feature-list li::before {
+  background: var(--line-strong);
 }

@@ -142,7 +142,7 @@ describe('interactive surfaces', () => {
     expect(tabs[0]?.getAttribute('aria-selected')).toBe('false');
     expect(panels[3]?.hasAttribute('hidden')).toBe(false);
     expect(panels[0]?.hasAttribute('hidden')).toBe(true);
-    expect(panels[3]?.textContent).toContain('Profiles per game');
+    expect(panels[3]?.textContent).toContain('Game profiles');
     // Every panel stays in the document for crawlers and no-JS readers.
     expect(panels.every((panel) => panel.textContent && panel.textContent.length > 200)).toBe(
       true,
