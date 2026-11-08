@@ -1,5 +1,12 @@
 import { Link } from 'react-router-dom';
 import { Callout, SectionHead } from '../components/Blocks';
+import type { ReleaseManifest } from '../site';
+import { latestPublishedEntry, pickArtifact } from '../site';
+import data from '../releases.json';
+
+const manifest = data as unknown as ReleaseManifest;
+const latestEntry = latestPublishedEntry(manifest);
+const installer = pickArtifact(latestEntry, 'setup');
 
 const TOC = [
   { id: 'getting-started', label: 'Getting started' },
@@ -128,14 +135,26 @@ export function DocsPage() {
 
             <article className="doc-section" id="installation">
               <h2>Installation</h2>
-              <Callout tone="warn" title="Status">
-                <p>
-                  No verified Windows build has been published yet, so there is nothing to
-                  install at this moment. The <Link to="/download">download page</Link> is the
-                  source of truth for availability and will show a version, date, size and
-                  SHA-256 once the release pipeline has produced and verified artifacts.
-                </p>
-              </Callout>
+              {installer?.url ? (
+                <Callout tone="info" title={`Version ${latestEntry?.version} is published`}>
+                  <p>
+                    Download it from the <Link to="/download">download page</Link> — the button
+                    saves the installer executable directly. The build is not code-signed, so
+                    Windows SmartScreen may warn on first run: choose “More info”, then “Run
+                    anyway”. Your library lives in your roaming application-data directory, so
+                    updating or uninstalling never deletes it.
+                  </p>
+                </Callout>
+              ) : (
+                <Callout tone="warn" title="Status">
+                  <p>
+                    No verified Windows build has been published yet, so there is nothing to
+                    install at this moment. The <Link to="/download">download page</Link> is the
+                    source of truth for availability and will show a version, date, size and
+                    SHA-256 once the release pipeline has produced and verified artifacts.
+                  </p>
+                </Callout>
+              )}
               <h3>Installer build</h3>
               <p>
                 A one-click NSIS setup: double-click the downloaded file and it installs with no

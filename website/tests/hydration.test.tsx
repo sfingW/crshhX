@@ -154,16 +154,30 @@ describe('hydration', () => {
     expect(container.querySelector('h1')?.textContent).toBe('How crshhx works');
   });
 
-  it('leaves the download call to action disabled while nothing has shipped', async () => {
+  it('turns the download call to action into direct executable links once shipped', async () => {
     const { container } = await hydrate('/download');
-    const buttons = [...container.querySelectorAll<HTMLButtonElement>('.dl-card button')];
-    expect(buttons.length).toBe(2);
-    for (const button of buttons) {
-      expect(button.disabled).toBe(true);
-      expect(button.getAttribute('aria-disabled')).toBe('true');
-      expect(button.closest('a')).toBeNull();
+
+    // No disabled placeholders survive a published release.
+    expect(container.querySelectorAll('.dl-card button')).toHaveLength(0);
+    expect(container.textContent).not.toContain('No verified build has been published yet');
+
+    // Hero pair plus the two distribution cards: four direct file links,
+    // each with a download attribute so the click saves the .exe itself.
+    const exeLinks = [...container.querySelectorAll<HTMLAnchorElement>('a[href$=".exe"]')];
+    expect(exeLinks.length).toBe(4);
+    for (const link of exeLinks) {
+      expect(link.getAttribute('href')).toContain(
+        'https://github.com/sfingW/crshhX/releases/download/v1.1.0/',
+      );
+      expect(link.hasAttribute('download')).toBe(true);
     }
-    expect(container.querySelectorAll('a[href$=".exe"]')).toHaveLength(0);
-    expect(container.textContent).toContain('No verified build has been published yet');
+
+    const hero = exeLinks.find((link) => link.textContent?.includes('Download for Windows'));
+    expect(hero?.getAttribute('href')).toContain('crshhx-crosshair-studio-setup-1.1.0.exe');
+    const portable = exeLinks.find((link) =>
+      link.textContent?.includes('Download portable version'),
+    );
+    expect(portable?.getAttribute('href')).toContain('crshhx-crosshair-studio-portable-1.1.0.exe');
+    expect(problems).toEqual([]);
   });
 });

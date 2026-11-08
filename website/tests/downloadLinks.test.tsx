@@ -79,4 +79,17 @@ describe('download page with a published manifest', () => {
     expect(html).not.toContain('choose a directory');
     expect(html).not.toContain('You pick the install directory');
   });
+
+  it('leads with the requested call-to-action pair', () => {
+    // Primary button: direct installer download.
+    expect(html).toMatch(
+      /<a[^>]*class="btn btn-primary"[^>]*href="[^"]*studio-setup-1\.0\.0\.exe"[^>]*>/,
+    );
+    expect(html).toContain('Download for Windows');
+    // Smaller secondary link: direct portable download.
+    expect(html).toMatch(/<a[^>]*class="dl-portable-link"[^>]*studio-portable-1\.0\.0\.exe/);
+    expect(html).toContain('Download portable version');
+    // The unsigned-build warning is always part of the live state.
+    expect(html).toContain('SmartScreen');
+  });
 });
