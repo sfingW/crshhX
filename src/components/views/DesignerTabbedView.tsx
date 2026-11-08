@@ -1,24 +1,23 @@
-import React, { useState } from 'react';
-import { CrosshairConfig, CrosshairTopology } from '../../types/crosshair';
-import { ReticleRenderer } from '../ReticleRenderer';
+import React, { useEffect, useMemo, useState } from 'react';
+import type { CrosshairConfig } from '../../types/crosshair';
+import { DEFAULT_CONFIG } from '../../lib/defaultPresets';
+import { ReticleControls } from '../ReticleControls';
+import { BACKDROP_OPTIONS } from '../TargetBackdrops';
+import { useConfigHistory } from '../editor/useConfigHistory';
+import { ComparePanel, PinCompareButton, PreviewStage } from '../editor/ComparePanel';
 import {
-  Sliders,
-  Circle,
-  Square,
-  Sparkles,
-  Layers,
-  Save,
-  Share2,
-  Copy,
-  Trash2,
-  Edit2,
   Check,
+  Copy,
+  Edit2,
   Eye,
   EyeOff,
-  ArrowUp,
-  ArrowDown,
-  ArrowLeft,
-  ArrowRight,
+  Layers,
+  RotateCcw,
+  Save,
+  Share2,
+  Undo2,
+  Redo2,
+  X,
 } from 'lucide-react';
 
 interface DesignerTabbedViewProps {
@@ -27,30 +26,173 @@ interface DesignerTabbedViewProps {
   onSavePreset: (name: string) => void;
 }
 
+/**
+ * The crosshair designer.
+ *
+ * Layout: a sub-header with document actions, the full parameter inspector on
+ * the left, and a live preview stage on the right. The preview renders through
+ * `ReticleRenderer` — the exact same component the overlay uses — so what is on
+ * screen here is what appears in game, with no second rendering path to drift.
+ *
+ * Two things were consolidated here deliberately:
+ *
+ * - Parameter editing is delegated to `ReticleControls`, which previously sat
+ *   unused while this file carried a second, smaller copy of the same sliders.
+ *   One editor now, so a control can never exist in one place and not the other.
+ * - The old "Layers" panel listed four fake layers with a "+ New Layer" button
+ *   that only switched tabs. A crosshair is one config, not a layer stack, so
+ *   that panel was removed in favour of a real component visibility list — each
+ *   row toggles a field the renderer actually reads.
+ */
 export const DesignerTabbedView: React.FC<DesignerTabbedViewProps> = ({
   config,
   onChange,
   onSavePreset,
 }) => {
-  const [activeTab, setActiveTab] = useState<'lines' | 'center-dot' | 'outline' | 'animations' | 'layer'>('lines');
+  const history = useConfigHistory(config, onChange);
+
   const [crosshairTitle, setCrosshairTitle] = useState(config.name);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [zoomLevel, setZoomLevel] = useState<number>(2);
   const [isFiring, setIsFiring] = useState(false);
   const [isAds, setIsAds] = useState(false);
+  const [backdropId, setBackdropId] = useState<string>(BACKDROP_OPTIONS[0].id);
+  const [copied, setCopied] = useState(false);
+  const [confirmingReset, setConfirmingReset] = useState(false);
+  /** The "A" variation in a comparison, or null when not comparing. */
+  const [pinned, setPinned] = useState<CrosshairConfig | null>(null);
+
+  // A different crosshair can be loaded from the vault while this view stays
+  // mounted; the title field has to follow it, and a pinned comparison of the
+  // previous crosshair would be meaningless.
+  useEffect(() => {
+    setCrosshairTitle(config.name);
+  }, [config.name]);
+
+  useEffect(() => {
+    setPinned((current) => (current && current.id !== config.id ? null : current));
+  }, [config.id]);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 1800);
+    return () => clearTimeout(timer);
+  }, [copied]);
+
+  const backdrop = useMemo(
+    () => BACKDROP_OPTIONS.find((b) => b.id === backdropId) ?? BACKDROP_OPTIONS[0],
+    [backdropId],
+  );
+
+  /* Keyboard undo/redo, suppressed while typing in a field. */
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const key = e.key.toLowerCase();
+      if (key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        history.undo();
+      } else if ((key === 'z' && e.shiftKey) || key === 'y') {
+        e.preventDefault();
+        history.redo();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [history]);
 
   const handleTitleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setIsEditingTitle(false);
-    onChange({ name: crosshairTitle });
+    const next = crosshairTitle.trim();
+    if (!next || next === config.name) {
+      setCrosshairTitle(config.name);
+      return;
+    }
+    history.handleChange({ name: next });
   };
+
+  const handleCopyJson = async () => {
+    const payload = JSON.stringify(config, null, 2);
+    try {
+      await navigator.clipboard.writeText(payload);
+      setCopied(true);
+    } catch {
+      // Clipboard access can be denied; fall back to a selectable dump rather
+      // than failing silently.
+      window.prompt('Copy the crosshair JSON:', payload);
+    }
+  };
+
+  const handleResetAll = () => {
+    history.handleChange({
+      ...DEFAULT_CONFIG,
+      id: config.id,
+      name: config.name,
+      game: config.game,
+      isBuiltIn: config.isBuiltIn,
+    });
+    setConfirmingReset(false);
+  };
+
+  /** Every component the renderer can actually switch on or off. */
+  const components: Array<{
+    key: keyof CrosshairConfig;
+    label: string;
+    enabled: boolean;
+    applies: boolean;
+  }> = [
+    { key: 'hasTopArm', label: 'Top line', enabled: config.hasTopArm, applies: true },
+    { key: 'hasBottomArm', label: 'Bottom line', enabled: config.hasBottomArm, applies: true },
+    { key: 'hasLeftArm', label: 'Left line', enabled: config.hasLeftArm, applies: true },
+    { key: 'hasRightArm', label: 'Right line', enabled: config.hasRightArm, applies: true },
+    {
+      key: 'centerDotEnabled',
+      label: 'Centre dot',
+      enabled: config.centerDotEnabled,
+      applies: true,
+    },
+    {
+      key: 'outlineEnabled',
+      label: 'Outer outline',
+      enabled: config.outlineEnabled,
+      applies: config.topology !== 'dot',
+    },
+    {
+      key: 'innerOutlineEnabled',
+      label: 'Inner outline',
+      enabled: !!config.innerOutlineEnabled,
+      applies: config.topology !== 'dot',
+    },
+    {
+      key: 'circleEnabled',
+      label: 'Spread ring',
+      enabled: config.circleEnabled,
+      applies: true,
+    },
+    {
+      key: 'glowEnabled',
+      label: 'Glow',
+      enabled: config.glowEnabled,
+      applies: true,
+    },
+  ];
 
   return (
     <div className="flex-1 flex flex-col h-full bg-surface-base text-zinc-100 overflow-hidden select-none">
-      {/* Top Designer Sub-Header */}
-      <div className="flex items-center justify-between px-6 py-2.5 bg-surface-sidebar border-b border-surface-border text-xs">
-        {/* Title & Edit */}
-        <div className="flex items-center gap-3">
+      {/* Sub-header: document actions */}
+      <div className="flex items-center justify-between px-6 py-2.5 bg-surface-sidebar border-b border-surface-border text-xs gap-4">
+        <div className="flex items-center gap-3 min-w-0">
           {isEditingTitle ? (
             <form onSubmit={handleTitleSubmit} className="flex items-center gap-2">
               <input
@@ -58,25 +200,58 @@ export const DesignerTabbedView: React.FC<DesignerTabbedViewProps> = ({
                 autoFocus
                 value={crosshairTitle}
                 onChange={(e) => setCrosshairTitle(e.target.value)}
-                onBlur={() => setIsEditingTitle(false)}
+                onBlur={handleTitleSubmit}
+                aria-label="Crosshair name"
+                maxLength={60}
                 className="bg-surface-card border rounded px-2 py-1 text-zinc-100 text-xs font-semibold focus:outline-none"
                 style={{ borderColor: 'var(--brand-accent)' }}
               />
-              <button type="submit" style={{ color: 'var(--brand-accent)' }}>
+              <button type="submit" aria-label="Save name" style={{ color: 'var(--brand-accent)' }}>
                 <Check className="w-4 h-4" />
               </button>
             </form>
           ) : (
-            <div className="flex items-center gap-2 cursor-pointer group" onClick={() => setIsEditingTitle(true)}>
-              <Edit2 className="w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-300" />
-              <span className="font-bold text-sm text-zinc-100">{config.name}</span>
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsEditingTitle(true)}
+              className="flex items-center gap-2 cursor-pointer group min-w-0"
+              aria-label="Rename crosshair"
+            >
+              <Edit2 className="w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-300 shrink-0" />
+              <span className="font-bold text-sm text-zinc-100 truncate">{config.name}</span>
+            </button>
           )}
         </div>
 
-        {/* Action icons */}
-        <div className="flex items-center gap-4 text-zinc-400">
+        <div className="flex items-center gap-4 text-zinc-400 shrink-0">
+          {/* History */}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={history.undo}
+              disabled={!history.canUndo}
+              title={history.canUndo ? 'Undo (Ctrl+Z)' : 'Nothing to undo'}
+              aria-label="Undo"
+              className="p-1 rounded transition-colors enabled:hover:text-zinc-100 enabled:hover:bg-surface-card disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={history.redo}
+              disabled={!history.canRedo}
+              title={history.canRedo ? 'Redo (Ctrl+Shift+Z)' : 'Nothing to redo'}
+              aria-label="Redo"
+              className="p-1 rounded transition-colors enabled:hover:text-zinc-100 enabled:hover:bg-surface-card disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <Redo2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="h-3.5 w-px bg-surface-border" />
+
           <button
+            type="button"
             onClick={() => onSavePreset(config.name)}
             className="flex items-center gap-1.5 hover:text-zinc-100 transition-colors"
           >
@@ -85,20 +260,20 @@ export const DesignerTabbedView: React.FC<DesignerTabbedViewProps> = ({
           </button>
 
           <button
-            onClick={() => {
-              navigator.clipboard.writeText(JSON.stringify(config, null, 2));
-              alert('Crosshair configuration copied to clipboard!');
-            }}
+            type="button"
+            onClick={handleCopyJson}
             className="flex items-center gap-1.5 hover:text-zinc-100 transition-colors"
           >
-            <Share2 className="w-3.5 h-3.5" />
-            <span>Share</span>
+            {copied ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
+            <span>{copied ? 'Copied' : 'Copy JSON'}</span>
           </button>
 
-          <div className="h-3.5 w-[1px] bg-surface-border" />
+          <div className="h-3.5 w-px bg-surface-border" />
 
           <button
-            title="Duplicate Layer"
+            type="button"
+            title="Save a copy as a new preset"
+            aria-label="Save a copy as a new preset"
             onClick={() => onSavePreset(`${config.name} (Copy)`)}
             className="hover:text-zinc-100 transition-colors"
           >
@@ -106,592 +281,213 @@ export const DesignerTabbedView: React.FC<DesignerTabbedViewProps> = ({
           </button>
 
           <button
-            title="Reset Crosshair"
-            onClick={() =>
-              onChange({
-                length: 4,
-                thickness: 2,
-                gap: 2,
-                primaryColor: '#ffffff',
-                hasTopArm: true,
-                hasBottomArm: true,
-                hasLeftArm: true,
-                hasRightArm: true,
-              })
-            }
+            type="button"
+            title="Reset all parameters"
+            aria-label="Reset all parameters"
+            onClick={() => setConfirmingReset(true)}
             className="hover:text-rose-400 transition-colors"
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <RotateCcw className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Sub-Tabs Along the Top (Lines, Center Dot, Outline, Animations, Layer) */}
-      <div className="flex items-center px-6 bg-surface-sidebar border-b border-surface-border text-xs gap-6">
-        {[
-          { id: 'lines', label: 'Lines', icon: Sliders },
-          { id: 'center-dot', label: 'Center Dot', icon: Circle },
-          { id: 'outline', label: 'Outline', icon: Square },
-          { id: 'animations', label: 'Animations', icon: Sparkles },
-          { id: 'layer', label: 'Layer', icon: Layers },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
+      {/* Inline reset confirmation — non-blocking, unlike a native dialog */}
+      {confirmingReset && (
+        <div
+          role="alertdialog"
+          aria-label="Confirm reset"
+          className="flex items-center justify-between gap-3 px-6 py-2 bg-rose-950/40 border-b border-rose-900/50 text-[11px]"
+        >
+          <span className="text-rose-200">
+            Reset every parameter of <strong>{config.name}</strong> back to the crshhx default
+            crosshair? Its name and game stay, and nothing is saved until you press Save. You can
+            undo this with Ctrl+Z.
+          </span>
+          <span className="flex items-center gap-2 shrink-0">
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 py-2.5 border-b-2 font-medium transition-all ${
-                isActive
-                  ? 'text-zinc-100 font-semibold'
-                  : 'text-zinc-400 border-transparent hover:text-zinc-200'
-              }`}
-              style={{
-                borderColor: isActive ? 'var(--brand-accent)' : 'transparent',
-              }}
+              type="button"
+              onClick={handleResetAll}
+              className="px-2.5 py-1 rounded bg-rose-600 text-white hover:bg-rose-500 transition-colors font-medium"
             >
-              <div
-                className="w-4 h-4 rounded flex items-center justify-center border"
-                style={{
-                  borderColor: isActive ? 'var(--brand-accent)' : '#52525b',
-                  color: isActive ? 'var(--brand-accent)' : '#71717a',
-                }}
-              >
-                <Icon className="w-2.5 h-2.5" />
-              </div>
-              <span>{tab.label}</span>
+              Reset parameters
             </button>
-          );
-        })}
-      </div>
+            <button
+              type="button"
+              onClick={() => setConfirmingReset(false)}
+              aria-label="Cancel reset"
+              className="p-1 rounded text-rose-300 hover:text-white hover:bg-rose-900/60 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </span>
+        </div>
+      )}
 
-      {/* Main Workspace (Left: Property Inspector, Right: Live Canvas & Layers) */}
+      {/* Workspace */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left / Center: Property Inspector */}
-        <div className="flex-1 p-8 overflow-y-auto space-y-6 scrollbar-thin">
-          {/* TAB 1: LINES */}
-          {activeTab === 'lines' && (
-            <div className="space-y-6 max-w-2xl">
-              {/* Lines Header with Visible toggle */}
-              <div className="flex items-center gap-3 pb-4 border-b border-surface-border">
-                <div className="w-10 h-10 rounded-lg bg-surface-card border border-surface-border flex items-center justify-center">
-                  <ReticleRenderer config={config} scale={0.8} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-zinc-100">Lines</h3>
-                  <span className="text-[11px] flex items-center gap-1 font-medium" style={{ color: 'var(--brand-accent)' }}>
-                    <Check className="w-3 h-3" /> Visible
-                  </span>
-                </div>
-              </div>
-
-              {/* Appearance Section */}
-              <div className="space-y-4">
-                <span className="text-[11px] uppercase font-mono tracking-wider text-zinc-500 font-semibold block">
-                  Appearance
-                </span>
-
-                {/* Color Swatch */}
-                <div className="flex items-center gap-4">
-                  <span className="text-zinc-400 text-xs w-20">Color</span>
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-8 h-8 rounded border border-zinc-600 cursor-pointer overflow-hidden relative"
-                      style={{ backgroundColor: config.primaryColor }}
-                    >
-                      <input
-                        type="color"
-                        value={config.primaryColor}
-                        onChange={(e) => onChange({ primaryColor: e.target.value })}
-                        className="absolute inset-0 opacity-0 cursor-pointer"
-                      />
-                    </div>
-                    <button
-                      onClick={() => onChange({ primaryColor: '#ffffff' })}
-                      className="text-zinc-400 hover:text-zinc-200 text-xs flex items-center gap-1 px-2 py-1 bg-surface-card rounded border border-surface-border"
-                    >
-                      <span>✕ Clear</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Visible Directional Arrows ↑ ↓ ← → */}
-                <div className="flex items-center gap-4">
-                  <span className="text-zinc-400 text-xs w-20">Visible</span>
-                  <div className="flex items-center gap-1.5">
-                    {[
-                      { key: 'hasTopArm', icon: ArrowUp },
-                      { key: 'hasBottomArm', icon: ArrowDown },
-                      { key: 'hasLeftArm', icon: ArrowLeft },
-                      { key: 'hasRightArm', icon: ArrowRight },
-                    ].map((item) => {
-                      const active = config[item.key as keyof CrosshairConfig];
-                      const Icon = item.icon;
-                      return (
-                        <button
-                          key={item.key}
-                          onClick={() => onChange({ [item.key]: !active })}
-                          className={`p-2 rounded border transition-all ${
-                            active
-                              ? 'bg-surface-card text-zinc-100'
-                              : 'bg-surface-sidebar text-zinc-600 border-surface-border'
-                          }`}
-                          style={{
-                            borderColor: active ? 'var(--brand-accent-border)' : undefined,
-                            color: active ? 'var(--brand-accent)' : undefined,
-                          }}
-                        >
-                          <Icon className="w-3.5 h-3.5" />
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Shape: Square vs Triangle */}
-                <div className="flex items-center gap-4">
-                  <span className="text-zinc-400 text-xs w-20">Shape</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => onChange({ topology: 'cross' })}
-                      className={`p-2 rounded border transition-all ${
-                        config.topology === 'cross'
-                          ? 'bg-surface-card text-zinc-100'
-                          : 'bg-surface-sidebar text-zinc-500 border-surface-border'
-                      }`}
-                      style={{
-                        borderColor: config.topology === 'cross' ? 'var(--brand-accent-border)' : undefined,
-                        color: config.topology === 'cross' ? 'var(--brand-accent)' : undefined,
-                      }}
-                    >
-                      <Square className="w-3.5 h-3.5 fill-current" />
-                    </button>
-                    <button
-                      onClick={() => onChange({ topology: 'chevron' })}
-                      className={`p-2 rounded border transition-all ${
-                        config.topology === 'chevron'
-                          ? 'bg-surface-card text-zinc-100'
-                          : 'bg-surface-sidebar text-zinc-500 border-surface-border'
-                      }`}
-                      style={{
-                        borderColor: config.topology === 'chevron' ? 'var(--brand-accent-border)' : undefined,
-                        color: config.topology === 'chevron' ? 'var(--brand-accent)' : undefined,
-                      }}
-                    >
-                      ▲
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Line Properties Section */}
-              <div className="space-y-4 pt-4 border-t border-surface-border">
-                <span className="text-[11px] uppercase font-mono tracking-wider text-zinc-500 font-semibold block">
-                  Line Properties
-                </span>
-
-                {/* Opacity */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-300">Opacity</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={config.primaryOpacity}
-                      onChange={(e) => onChange({ primaryOpacity: Number(e.target.value) })}
-                      className="w-12 bg-surface-sidebar border border-surface-border rounded px-1.5 py-0.5 text-right font-mono text-zinc-100"
-                    />
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    value={config.primaryOpacity}
-                    onChange={(e) => onChange({ primaryOpacity: Number(e.target.value) })}
-                    className="w-full"
-                  />
-                </div>
-
-                {/* Length */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-300">Length</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="35"
-                      value={config.length}
-                      onChange={(e) => onChange({ length: Number(e.target.value) })}
-                      className="w-12 bg-surface-sidebar border border-surface-border rounded px-1.5 py-0.5 text-right font-mono text-zinc-100"
-                    />
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="35"
-                    value={config.length}
-                    onChange={(e) => onChange({ length: Number(e.target.value) })}
-                    className="w-full"
-                  />
-                </div>
-
-                {/* Thickness */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-300">Thickness</span>
-                    <input
-                      type="number"
-                      min="1"
-                      max="16"
-                      step="0.5"
-                      value={config.thickness}
-                      onChange={(e) => onChange({ thickness: Number(e.target.value) })}
-                      className="w-12 bg-surface-sidebar border border-surface-border rounded px-1.5 py-0.5 text-right font-mono text-zinc-100"
-                    />
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="16"
-                    step="0.5"
-                    value={config.thickness}
-                    onChange={(e) => onChange({ thickness: Number(e.target.value) })}
-                    className="w-full"
-                  />
-                </div>
-
-                {/* Center Gap */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-300">Offset / Gap</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="35"
-                      value={config.gap}
-                      onChange={(e) => onChange({ gap: Number(e.target.value) })}
-                      className="w-12 bg-surface-sidebar border border-surface-border rounded px-1.5 py-0.5 text-right font-mono text-zinc-100"
-                    />
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="35"
-                    value={config.gap}
-                    onChange={(e) => onChange({ gap: Number(e.target.value) })}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: CENTER DOT */}
-          {activeTab === 'center-dot' && (
-            <div className="space-y-6 max-w-2xl">
-              <div className="flex items-center justify-between pb-4 border-b border-surface-border">
-                <div>
-                  <h3 className="font-bold text-sm text-zinc-100">Center Dot</h3>
-                  <p className="text-zinc-400 text-xs">Headshot focal point</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={config.centerDotEnabled}
-                  onChange={(e) => onChange({ centerDotEnabled: e.target.checked })}
-                  className="w-4 h-4 cursor-pointer"
-                  style={{ accentColor: 'var(--brand-accent)' }}
-                />
-              </div>
-
-              {config.centerDotEnabled && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    <span className="text-zinc-400 text-xs w-20">Shape</span>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => onChange({ centerDotShape: 'square' })}
-                        className={`px-3 py-1.5 rounded text-xs border ${
-                          config.centerDotShape === 'square'
-                            ? 'bg-surface-card text-zinc-100'
-                            : 'bg-surface-sidebar text-zinc-500 border-surface-border'
-                        }`}
-                        style={{
-                          borderColor: config.centerDotShape === 'square' ? 'var(--brand-accent-border)' : undefined,
-                          color: config.centerDotShape === 'square' ? 'var(--brand-accent)' : undefined,
-                        }}
-                      >
-                        Square
-                      </button>
-                      <button
-                        onClick={() => onChange({ centerDotShape: 'circle' })}
-                        className={`px-3 py-1.5 rounded text-xs border ${
-                          config.centerDotShape === 'circle'
-                            ? 'bg-surface-card text-zinc-100'
-                            : 'bg-surface-sidebar text-zinc-500 border-surface-border'
-                        }`}
-                        style={{
-                          borderColor: config.centerDotShape === 'circle' ? 'var(--brand-accent-border)' : undefined,
-                          color: config.centerDotShape === 'circle' ? 'var(--brand-accent)' : undefined,
-                        }}
-                      >
-                        Round
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-zinc-300">Dot Size</span>
-                      <span className="font-mono" style={{ color: 'var(--brand-accent)' }}>
-                        {config.centerDotSize} px
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="1"
-                      max="10"
-                      step="0.5"
-                      value={config.centerDotSize}
-                      onChange={(e) => onChange({ centerDotSize: Number(e.target.value) })}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 3: OUTLINE */}
-          {activeTab === 'outline' && (
-            <div className="space-y-6 max-w-2xl">
-              <div className="flex items-center justify-between pb-4 border-b border-surface-border">
-                <div>
-                  <h3 className="font-bold text-sm text-zinc-100">Outline</h3>
-                  <p className="text-zinc-400 text-xs">Black border for high target contrast</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={config.outlineEnabled}
-                  onChange={(e) => onChange({ outlineEnabled: e.target.checked })}
-                  className="w-4 h-4 cursor-pointer"
-                  style={{ accentColor: 'var(--brand-accent)' }}
-                />
-              </div>
-
-              {config.outlineEnabled && (
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-zinc-300">Thickness</span>
-                      <span className="font-mono" style={{ color: 'var(--brand-accent)' }}>
-                        {config.outlineThickness} px
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="1"
-                      max="4"
-                      step="0.5"
-                      value={config.outlineThickness}
-                      onChange={(e) => onChange({ outlineThickness: Number(e.target.value) })}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 4: ANIMATIONS & BLOOM */}
-          {activeTab === 'animations' && (
-            <div className="space-y-6 max-w-2xl">
-              <div className="p-4 bg-surface-card rounded-lg border border-surface-border space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-bold text-sm text-zinc-100">Recoil Firing Bloom</h4>
-                    <p className="text-zinc-400 text-xs">Crosshair spreads on weapon fire</p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={config.dynamicFiring}
-                    onChange={(e) => onChange({ dynamicFiring: e.target.checked })}
-                    className="w-4 h-4 cursor-pointer"
-                    style={{ accentColor: 'var(--brand-accent)' }}
-                  />
-                </div>
-
-                {config.dynamicFiring && (
-                  <div className="space-y-3 pt-3 border-t border-surface-border">
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-zinc-300">Bloom Spread Amount</span>
-                        <span className="font-mono" style={{ color: 'var(--brand-accent)' }}>
-                          +{config.firingBloomExpansion} px
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min="2"
-                        max="16"
-                        value={config.firingBloomExpansion}
-                        onChange={(e) => onChange({ firingBloomExpansion: Number(e.target.value) })}
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 5: LAYER */}
-          {activeTab === 'layer' && (
-            <div className="space-y-6 max-w-2xl">
-              <div className="flex items-center justify-between pb-4 border-b border-surface-border">
-                <div>
-                  <h3 className="font-bold text-sm text-zinc-100">Spread & Ring Layer</h3>
-                  <p className="text-zinc-400 text-xs">Shotgun spread or sniper outer ring</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={config.circleEnabled}
-                  onChange={(e) => onChange({ circleEnabled: e.target.checked })}
-                  className="w-4 h-4 cursor-pointer"
-                  style={{ accentColor: 'var(--brand-accent)' }}
-                />
-              </div>
-
-              {config.circleEnabled && (
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-zinc-300">Ring Radius</span>
-                      <span className="font-mono" style={{ color: 'var(--brand-accent)' }}>
-                        {config.circleRadius} px
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="6"
-                      max="50"
-                      value={config.circleRadius}
-                      onChange={(e) => onChange({ circleRadius: Number(e.target.value) })}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+        {/* Left: the full parameter inspector */}
+        <div className="flex-1 min-w-0 overflow-y-auto scrollbar-thin">
+          <ReticleControls
+            config={config}
+            onChange={history.handleChange}
+            onResetCenter={() => history.handleChange({ offsetX: 0, offsetY: 0 })}
+          />
         </div>
 
-        {/* Right Area: Live Target & Layers Stack */}
-        <div className="w-80 bg-surface-sidebar border-l border-surface-border flex flex-col shrink-0">
-          {/* Top: Live Target Preview Canvas */}
-          <div className="p-4 border-b border-surface-border flex flex-col">
-            <div className="flex items-center justify-between text-[11px] text-zinc-400 font-mono mb-2">
-              <span>TARGET PREVIEW</span>
-              <span>{Math.round(zoomLevel * 100)}%</span>
+        {/* Right: live preview stage */}
+        <div className="w-[340px] shrink-0 border-l border-surface-border bg-surface-sidebar flex flex-col overflow-y-auto scrollbar-thin">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-2 gap-2">
+              <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-500 font-semibold">
+                {pinned ? 'Compare' : 'Live preview'}
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="text-[10px] font-mono text-zinc-600">{zoomLevel}×</span>
+                {!pinned && <PinCompareButton onPin={() => setPinned({ ...config })} />}
+              </span>
             </div>
 
-            <div
-              className="w-full h-56 rounded-lg bg-surface-base border border-surface-border relative flex items-center justify-center overflow-hidden cursor-crosshair select-none"
-              onMouseDown={(e) => {
-                if (e.button === 0) {
-                  setIsFiring(true);
-                  setTimeout(() => setIsFiring(false), config.firingDecayMs || 120);
-                } else if (e.button === 2) {
-                  setIsAds(true);
+            {pinned ? (
+              <ComparePanel
+                pinned={pinned}
+                current={config}
+                scale={zoomLevel}
+                backdrop={backdrop}
+                onUpdatePin={() => setPinned({ ...config })}
+                onRestorePinned={() =>
+                  // Restoring A is an edit, so it goes through history and can
+                  // itself be undone. The document identity stays put.
+                  history.handleChange({ ...pinned, id: config.id, name: config.name })
                 }
-              }}
-              onMouseUp={(e) => {
-                if (e.button === 2) setIsAds(false);
-              }}
-              onContextMenu={(e) => e.preventDefault()}
-            >
-              {/* Subtle technical cross lines */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
-                <div className="w-full h-[1px] bg-white/20" />
-                <div className="absolute h-full w-[1px] bg-white/20" />
-              </div>
-
-              <ReticleRenderer
+                onClear={() => setPinned(null)}
+              />
+            ) : (
+              <PreviewStage
                 config={config}
                 scale={zoomLevel}
+                backdrop={backdrop}
                 isFiring={isFiring}
                 isAds={isAds}
+                interactive
+                onFireStart={() => {
+                  setIsFiring(true);
+                  setTimeout(() => setIsFiring(false), config.firingDecayMs || 120);
+                }}
+                onAdsChange={(active) => {
+                  // Also clears on pointer-leave, so a simulated ADS can never
+                  // be left stuck if the pointer exits mid-hold.
+                  setIsAds(active);
+                  if (!active) setIsFiring(false);
+                }}
               />
+            )}
 
-              <div className="absolute bottom-2 left-2 text-[9px] font-mono text-zinc-500 pointer-events-none">
-                L-Click: Fire Bloom • R-Click: ADS
-              </div>
-            </div>
-
-            {/* Zoom selector */}
+            {/* Zoom */}
             <div className="flex items-center justify-center gap-1.5 mt-2">
-              {[1, 2, 4].map((z) => (
+              {[1, 2, 4, 8].map((z) => (
                 <button
                   key={z}
+                  type="button"
                   onClick={() => setZoomLevel(z)}
-                  className={`px-2 py-0.5 rounded text-[10px] font-mono ${
+                  aria-pressed={zoomLevel === z}
+                  aria-label={`Zoom ${z} times`}
+                  className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
                     zoomLevel === z ? 'font-bold text-black' : 'text-zinc-500 hover:text-zinc-300'
                   }`}
                   style={{
                     backgroundColor: zoomLevel === z ? 'var(--brand-accent)' : undefined,
                   }}
                 >
-                  {z}x
+                  {z}×
                 </button>
               ))}
             </div>
+
+            {/* Preview background */}
+            <div className="mt-3 space-y-1.5">
+              <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-500 font-semibold block">
+                Preview background
+              </span>
+              <div className="grid grid-cols-2 gap-1.5">
+                {BACKDROP_OPTIONS.map((option) => {
+                  const active = option.id === backdropId;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setBackdropId(option.id)}
+                      title={`${option.name} — ${option.category}`}
+                      aria-pressed={active}
+                      className={`h-9 rounded border text-[10px] text-left px-2 truncate transition-all ${
+                        active
+                          ? 'border-transparent text-zinc-100 font-medium'
+                          : 'border-surface-border text-zinc-500 hover:text-zinc-300'
+                      }`}
+                      style={{
+                        ...option.backgroundStyle,
+                        backgroundColor: active ? undefined : option.backgroundStyle.backgroundColor,
+                        boxShadow: active ? 'inset 0 0 0 1px var(--brand-accent)' : undefined,
+                        textShadow: '0 1px 2px rgba(0,0,0,.85)',
+                      }}
+                    >
+                      {option.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
-          {/* Bottom: Layers Panel */}
-          <div className="flex-1 p-4 flex flex-col overflow-y-auto text-xs">
-            <div className="flex items-center justify-between mb-3">
-              <span className="font-semibold text-zinc-300 flex items-center gap-1.5">
+          {/* Component visibility — every row maps to a field the renderer reads */}
+          <div className="px-4 pb-4 flex-1">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-semibold text-zinc-300 flex items-center gap-1.5 text-xs">
                 <Layers className="w-3.5 h-3.5" style={{ color: 'var(--brand-accent)' }} />
-                Layers
+                Components
               </span>
-              <button
-                onClick={() => setActiveTab('lines')}
-                className="text-[11px] hover:underline"
-                style={{ color: 'var(--brand-accent)' }}
-              >
-                + New Layer
-              </button>
+              <span className="text-[10px] font-mono text-zinc-600">
+                {components.filter((c) => c.enabled && c.applies).length}/{components.length} on
+              </span>
             </div>
 
-            {/* Layers List */}
-            <div className="space-y-1.5">
-              {[
-                { id: 'lines', name: 'Layer 0: Primary Lines', active: config.length > 0 },
-                { id: 'center-dot', name: 'Layer 1: Center Dot', active: config.centerDotEnabled },
-                { id: 'outline', name: 'Layer 2: Outline', active: config.outlineEnabled },
-                { id: 'layer', name: 'Layer 3: Spread Ring', active: config.circleEnabled },
-              ].map((layer) => (
-                <div
-                  key={layer.id}
-                  onClick={() => setActiveTab(layer.id as any)}
-                  className={`flex items-center justify-between p-2 rounded-md border cursor-pointer transition-all ${
-                    activeTab === layer.id
-                      ? 'bg-surface-card text-zinc-100 font-medium'
-                      : 'bg-surface-sidebar border-surface-border text-zinc-400 hover:text-zinc-200'
+            <div className="space-y-1">
+              {components.map((component) => (
+                <button
+                  key={String(component.key)}
+                  type="button"
+                  disabled={!component.applies}
+                  onClick={() =>
+                    history.handleChange({ [component.key]: !component.enabled } as Partial<CrosshairConfig>)
+                  }
+                  aria-pressed={component.enabled}
+                  aria-label={`${component.enabled ? 'Hide' : 'Show'} ${component.label}`}
+                  title={
+                    component.applies
+                      ? `${component.label} — ${component.enabled ? 'visible' : 'hidden'}`
+                      : `${component.label} does not apply to the ${config.topology} style`
+                  }
+                  className={`w-full flex items-center justify-between p-2 rounded-md border transition-all text-left ${
+                    !component.applies
+                      ? 'bg-surface-sidebar border-surface-border text-zinc-600 cursor-not-allowed opacity-50'
+                      : component.enabled
+                        ? 'bg-surface-card border-surface-border text-zinc-100'
+                        : 'bg-surface-sidebar border-surface-border text-zinc-500 hover:text-zinc-300'
                   }`}
                   style={{
-                    borderColor: activeTab === layer.id ? 'var(--brand-accent-border)' : undefined,
+                    borderColor:
+                      component.enabled && component.applies
+                        ? 'var(--brand-accent-border)'
+                        : undefined,
                   }}
                 >
-                  <span className="text-[11px]">{layer.name}</span>
-                  {layer.active ? (
+                  <span className="text-[11px]">{component.label}</span>
+                  {component.enabled && component.applies ? (
                     <Eye className="w-3 h-3" style={{ color: 'var(--brand-accent)' }} />
                   ) : (
                     <EyeOff className="w-3 h-3 text-zinc-600" />
                   )}
-                </div>
+                </button>
               ))}
             </div>
           </div>

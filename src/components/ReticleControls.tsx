@@ -9,6 +9,10 @@ import {
   Minus,
   Plus,
 } from 'lucide-react';
+import { LIMITS, V2_DEFAULTS } from '../lib/crosshairSchema';
+import { ArmGeometryPanel } from './editor/ArmGeometryPanel';
+import { ColorField } from './editor/ColorField';
+import { NumberControl, SectionCard } from './editor/controls';
 
 interface ReticleControlsProps {
   config: CrosshairConfig;
@@ -22,15 +26,6 @@ export const ReticleControls: React.FC<ReticleControlsProps> = ({
   onResetCenter,
 }) => {
   const [activeTab, setActiveTab] = useState<'geometry' | 'color' | 'dynamics' | 'stretched'>('geometry');
-
-  const QUICK_PALETTE = [
-    { label: 'Cyan', hex: '#00ffff' },
-    { label: 'Green', hex: '#00ff66' },
-    { label: 'Yellow', hex: '#ffff00' },
-    { label: 'White', hex: '#ffffff' },
-    { label: 'Magenta', hex: '#ff00aa' },
-    { label: 'Red', hex: '#ff3333' },
-  ];
 
   return (
     <div className="flex flex-col h-full bg-panel-elevated border border-panel-border rounded-xl overflow-hidden shadow-xl">
@@ -100,117 +95,135 @@ export const ReticleControls: React.FC<ReticleControlsProps> = ({
                 <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-400 font-semibold block">
                   Arm Parameters
                 </span>
+                <button
+                  type="button"
+                  onClick={() => onChange({ length: 4, thickness: 2, gap: 2 })}
+                  title="Reset length, thickness and gap"
+                  aria-label="Reset length, thickness and gap"
+                  className="mb-2 p-1 rounded text-zinc-600 hover:text-zinc-200 hover:bg-panel-subtle transition-colors"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                </button>
 
-                {/* Length */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-zinc-300 font-medium">Length</span>
-                    <div className="flex items-center gap-1 font-mono">
-                      <input
-                        type="number"
-                        min="0"
-                        max="40"
-                        value={config.length}
-                        onChange={(e) => onChange({ length: Number(e.target.value) })}
-                        className="w-12 bg-panel-subtle border border-panel-border rounded px-1.5 py-0.5 text-right text-zinc-100 font-mono focus:outline-none focus:border-zinc-500"
-                      />
-                      <span className="text-zinc-500 text-[11px]">px</span>
-                    </div>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="40"
-                    value={config.length}
-                    onChange={(e) => onChange({ length: Number(e.target.value) })}
-                    className="w-full"
-                  />
-                </div>
-
-                {/* Thickness */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-zinc-300 font-medium">Thickness</span>
-                    <div className="flex items-center gap-1 font-mono">
-                      <input
-                        type="number"
-                        min="1"
-                        max="16"
-                        step="0.5"
-                        value={config.thickness}
-                        onChange={(e) => onChange({ thickness: Number(e.target.value) })}
-                        className="w-12 bg-panel-subtle border border-panel-border rounded px-1.5 py-0.5 text-right text-zinc-100 font-mono focus:outline-none focus:border-zinc-500"
-                      />
-                      <span className="text-zinc-500 text-[11px]">px</span>
-                    </div>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="16"
-                    step="0.5"
-                    value={config.thickness}
-                    onChange={(e) => onChange({ thickness: Number(e.target.value) })}
-                    className="w-full"
-                  />
-                </div>
-
-                {/* Gap */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-zinc-300 font-medium">Center Gap</span>
-                    <div className="flex items-center gap-1 font-mono">
-                      <input
-                        type="number"
-                        min="0"
-                        max="40"
-                        value={config.gap}
-                        onChange={(e) => onChange({ gap: Number(e.target.value) })}
-                        className="w-12 bg-panel-subtle border border-panel-border rounded px-1.5 py-0.5 text-right text-zinc-100 font-mono focus:outline-none focus:border-zinc-500"
-                      />
-                      <span className="text-zinc-500 text-[11px]">px</span>
-                    </div>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="40"
+                {/*
+                  Ranges come from LIMITS — the same table the schema validator
+                  clamps to — so a value the editor can produce can never be a
+                  value the validator would reject on reload.
+                */}
+                <NumberControl
+                  label="Length"
+                  value={config.length}
+                  min={LIMITS.length.min}
+                  max={LIMITS.length.max}
+                  step={LIMITS.length.step}
+                  onChange={(v) => onChange({ length: v })}
+                />
+                <NumberControl
+                  label="Thickness"
+                  value={config.thickness}
+                  min={LIMITS.thickness.min}
+                  max={LIMITS.thickness.max}
+                  step={LIMITS.thickness.step}
+                  onChange={(v) => onChange({ thickness: v })}
+                />
+                <div>
+                  <NumberControl
+                    label="Center Gap"
                     value={config.gap}
-                    onChange={(e) => onChange({ gap: Number(e.target.value) })}
-                    className="w-full"
+                    min={LIMITS.gap.min}
+                    max={LIMITS.gap.max}
+                    step={LIMITS.gap.step}
+                    onChange={(v) => onChange({ gap: v })}
                   />
+                  <p className="text-[10px] text-zinc-600 leading-snug pt-1">
+                    Negative values pull the arms past the centre until they meet — the solid plus
+                    used by many CS2 and Valorant pros.
+                  </p>
                 </div>
               </div>
             )}
 
-            {/* Individual Arm Mask */}
+            {/* Arms: directional mask + independent per-direction dimensions */}
             {config.topology !== 'dot' && config.topology !== 'chevron' && (
-              <div className="p-3.5 bg-panel-base rounded-xl border border-panel-border space-y-2">
-                <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-400 font-semibold block">
-                  Directional Masking
+              <div className="p-3.5 bg-panel-base rounded-xl border border-panel-border">
+                <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-400 font-semibold block mb-3">
+                  Arm Directions
                 </span>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {[
-                    { key: 'hasTopArm', label: 'Top [Y-]' },
-                    { key: 'hasBottomArm', label: 'Bottom [Y+]' },
-                    { key: 'hasLeftArm', label: 'Left [X-]' },
-                    { key: 'hasRightArm', label: 'Right [X+]' },
-                  ].map((arm) => {
-                    const active = config[arm.key as keyof CrosshairConfig];
-                    return (
-                      <button
-                        key={arm.key}
-                        onClick={() => onChange({ [arm.key]: !active })}
-                        className={`py-1.5 px-2 rounded-lg text-[11px] font-mono transition-all border ${
-                          active
-                            ? 'bg-zinc-800 text-zinc-100 border-zinc-600 font-semibold'
-                            : 'bg-panel-subtle text-zinc-500 border-panel-border hover:text-zinc-300'
-                        }`}
-                      >
-                        {arm.label}
-                      </button>
-                    );
-                  })}
+                <ArmGeometryPanel config={config} onChange={onChange} />
+              </div>
+            )}
+
+            {/* Transform: rotation + overall scale */}
+            {config.topology !== 'dot' && (
+              <div className="p-3.5 bg-panel-base rounded-xl border border-panel-border space-y-4">
+                <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-400 font-semibold block">
+                  Transform
+                </span>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-300 font-medium">Rotation</span>
+                    <div className="flex items-center gap-1 font-mono">
+                      <input
+                        type="number"
+                        min="0"
+                        max="360"
+                        step="1"
+                        value={config.rotation ?? 0}
+                        onChange={(e) => onChange({ rotation: Number(e.target.value) })}
+                        aria-label="Rotation degrees"
+                        className="w-14 bg-panel-subtle border border-panel-border rounded px-1.5 py-0.5 text-right text-zinc-100 font-mono focus:outline-none focus:border-zinc-500"
+                      />
+                      <span className="text-zinc-500 text-[11px] w-4">°</span>
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="360"
+                    step="1"
+                    value={config.rotation ?? 0}
+                    onChange={(e) => onChange({ rotation: Number(e.target.value) })}
+                    aria-label="Rotation slider"
+                    className="w-full"
+                  />
+                  <p className="text-[10px] text-zinc-600 leading-snug">
+                    Turns the arms about the centre — 45° makes a plus into an X. The spread ring
+                    stays unrotated because a circle looks the same at any angle.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-300 font-medium">Overall Scale</span>
+                    <div className="flex items-center gap-1 font-mono">
+                      <input
+                        type="number"
+                        min="0.25"
+                        max="3"
+                        step="0.05"
+                        value={config.scale ?? 1}
+                        onChange={(e) => onChange({ scale: Number(e.target.value) })}
+                        aria-label="Overall scale"
+                        className="w-14 bg-panel-subtle border border-panel-border rounded px-1.5 py-0.5 text-right text-zinc-100 font-mono focus:outline-none focus:border-zinc-500"
+                      />
+                      <span className="text-zinc-500 text-[11px] w-4">×</span>
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.25"
+                    max="3"
+                    step="0.05"
+                    value={config.scale ?? 1}
+                    onChange={(e) => onChange({ scale: Number(e.target.value) })}
+                    aria-label="Overall scale slider"
+                    className="w-full"
+                  />
+                  <p className="text-[10px] text-zinc-600 leading-snug">
+                    Scales the finished reticle without changing the pixel dimensions you dialled in
+                    above. 1× is the historical size.
+                  </p>
                 </div>
               </div>
             )}
@@ -255,57 +268,15 @@ export const ReticleControls: React.FC<ReticleControlsProps> = ({
         {/* ================= OPTICS & COLOR TAB ================= */}
         {activeTab === 'color' && (
           <div className="space-y-5">
-            {/* Color Pipeline */}
+            {/* Reticle colour, with hex / RGB / picker / swatches */}
             <div className="p-3.5 bg-panel-base rounded-xl border border-panel-border space-y-3">
-              <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-400 font-semibold block">
-                Reticle Emission Color
-              </span>
-
-              <div className="flex items-center gap-3">
-                <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-zinc-700 shrink-0">
-                  <input
-                    type="color"
-                    value={config.primaryColor}
-                    onChange={(e) => onChange({ primaryColor: e.target.value })}
-                    className="absolute inset-0 w-full h-full cursor-pointer scale-150"
-                  />
-                </div>
-                <input
-                  type="text"
-                  value={config.primaryColor}
-                  onChange={(e) => onChange({ primaryColor: e.target.value })}
-                  className="flex-1 bg-panel-subtle border border-panel-border rounded-lg px-3 py-1.5 font-mono text-zinc-100 uppercase focus:outline-none focus:border-zinc-500"
-                />
-              </div>
-
-              {/* Quick Swatches */}
-              <div className="grid grid-cols-6 gap-1.5 pt-1">
-                {QUICK_PALETTE.map((c) => (
-                  <button
-                    key={c.hex}
-                    onClick={() => onChange({ primaryColor: c.hex })}
-                    className="h-7 rounded-md border border-zinc-800 transition-transform hover:scale-105"
-                    style={{ backgroundColor: c.hex }}
-                    title={c.label}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Opacity */}
-            <div className="p-3.5 bg-panel-base rounded-xl border border-panel-border space-y-2">
-              <div className="flex justify-between text-zinc-300">
-                <span className="font-medium">Alpha Opacity</span>
-                <span className="font-mono text-zinc-200">{Math.round(config.primaryOpacity * 100)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0.1"
-                max="1.0"
-                step="0.05"
-                value={config.primaryOpacity}
-                onChange={(e) => onChange({ primaryOpacity: Number(e.target.value) })}
-                className="w-full"
+              <ColorField
+                label="Reticle Emission Color"
+                hint="Arms and, unless overridden, the centre dot"
+                value={config.primaryColor}
+                onChange={(hex) => onChange({ primaryColor: hex })}
+                opacity={config.primaryOpacity}
+                onOpacityChange={(o) => onChange({ primaryOpacity: o })}
               />
             </div>
 
@@ -369,38 +340,105 @@ export const ReticleControls: React.FC<ReticleControlsProps> = ({
             </div>
 
             {/* High-Contrast Outlines */}
-            <div className="p-3.5 bg-panel-base rounded-xl border border-panel-border space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="font-semibold text-zinc-200 block">Contrast Outline</span>
-                  <span className="text-[11px] text-zinc-400">Black border for target separation</span>
-                </div>
+            <SectionCard
+              title="Contrast Outline"
+              subtitle="Black border drawn around each element for target separation"
+              action={
                 <input
                   type="checkbox"
                   checked={config.outlineEnabled}
                   onChange={(e) => onChange({ outlineEnabled: e.target.checked })}
+                  aria-label="Enable contrast outline"
                   className="w-4 h-4 accent-emerald-500 cursor-pointer"
                 />
-              </div>
+              }
+              onReset={() =>
+                onChange({
+                  outlineEnabled: false,
+                  outlineColor: '#000000',
+                  outlineThickness: 1,
+                  outlineOpacity: 1,
+                })
+              }
+              inert={!config.outlineEnabled}
+            >
+              <NumberControl
+                label="Outline Stroke Width"
+                value={config.outlineThickness}
+                min={LIMITS.outlineThickness.min}
+                max={6}
+                step={LIMITS.outlineThickness.step}
+                onChange={(v) => onChange({ outlineThickness: v })}
+                disabled={!config.outlineEnabled}
+              />
+              <NumberControl
+                label="Outline Opacity"
+                value={Math.round(config.outlineOpacity * 100)}
+                min={0}
+                max={100}
+                step={1}
+                unit="%"
+                onChange={(v) => onChange({ outlineOpacity: v / 100 })}
+                disabled={!config.outlineEnabled}
+              />
+              <ColorField
+                label="Outline Colour"
+                value={config.outlineColor}
+                onChange={(hex) => onChange({ outlineColor: hex })}
+              />
+            </SectionCard>
 
-              {config.outlineEnabled && (
-                <div className="pt-2 border-t border-panel-border space-y-2">
-                  <div className="flex justify-between text-zinc-300">
-                    <span>Outline Stroke Width</span>
-                    <span className="font-mono text-zinc-200">{config.outlineThickness} px</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="4"
-                    step="0.5"
-                    value={config.outlineThickness}
-                    onChange={(e) => onChange({ outlineThickness: Number(e.target.value) })}
-                    className="w-full"
-                  />
-                </div>
-              )}
-            </div>
+            <SectionCard
+              title="Inner Outline"
+              subtitle="A border painted inside each element, for a hollow or cored look"
+              action={
+                <input
+                  type="checkbox"
+                  checked={!!config.innerOutlineEnabled}
+                  onChange={(e) => onChange({ innerOutlineEnabled: e.target.checked })}
+                  aria-label="Enable inner outline"
+                  className="w-4 h-4 accent-emerald-500 cursor-pointer"
+                />
+              }
+              onReset={() =>
+                onChange({
+                  innerOutlineEnabled: false,
+                  innerOutlineColor: V2_DEFAULTS.innerOutlineColor,
+                  innerOutlineThickness: V2_DEFAULTS.innerOutlineThickness,
+                  innerOutlineOpacity: V2_DEFAULTS.innerOutlineOpacity,
+                })
+              }
+              inert={!config.innerOutlineEnabled}
+            >
+              <NumberControl
+                label="Inner Stroke Width"
+                value={config.innerOutlineThickness ?? V2_DEFAULTS.innerOutlineThickness}
+                min={LIMITS.innerOutlineThickness.min}
+                max={LIMITS.innerOutlineThickness.max}
+                step={LIMITS.innerOutlineThickness.step}
+                onChange={(v) => onChange({ innerOutlineThickness: v })}
+                disabled={!config.innerOutlineEnabled}
+              />
+              <NumberControl
+                label="Inner Opacity"
+                value={Math.round((config.innerOutlineOpacity ?? 1) * 100)}
+                min={0}
+                max={100}
+                step={1}
+                unit="%"
+                onChange={(v) => onChange({ innerOutlineOpacity: v / 100 })}
+                disabled={!config.innerOutlineEnabled}
+              />
+              <ColorField
+                label="Inner Outline Colour"
+                value={config.innerOutlineColor ?? V2_DEFAULTS.innerOutlineColor}
+                onChange={(hex) => onChange({ innerOutlineColor: hex })}
+              />
+              <p className="text-[10px] text-zinc-600 leading-snug">
+                Arms thinner than twice the stroke width cannot hold an inner border, so it is
+                omitted on those rather than drawn inverted.
+              </p>
+            </SectionCard>
           </div>
         )}
 
