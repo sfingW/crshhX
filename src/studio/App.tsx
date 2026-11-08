@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { CrosshairConfig, AppSettings } from '../types/crosshair';
 import {
   loadCurrentConfig,
@@ -7,17 +7,29 @@ import {
   saveAppSettings,
   loadCustomPresets,
   saveCustomPresets,
+  loadWeaponSlotsState,
+  loadWeaponSlotsRuntimeState,
+  saveWeaponSlotsState,
+  createDebouncedRuntimeSaver,
 } from '../lib/storage';
 import { Sidebar, ActiveNavView } from '../components/Sidebar';
 import { TopHeader } from '../components/TopHeader';
 import { CrosshairsView } from '../components/views/CrosshairsView';
 import { DesignerTabbedView } from '../components/views/DesignerTabbedView';
 import { KeybindsView } from '../components/views/KeybindsView';
+import { WeaponSlotsView } from '../components/views/WeaponSlotsView';
 import { PositionView } from '../components/views/PositionView';
 import { ShareImportModal } from '../components/modals/ShareImportModal';
 import { COMPLETE_CROSSHAIR_VAULT } from '../lib/crosshairCollection';
-import { THEME_ACCENTS, ThemeAccent, applyThemeAccent, loadSavedThemeAccent } from '../lib/theme';
-import { ShieldCheck, Cpu, Activity, Lock } from 'lucide-react';
+import { ThemeAccent, applyThemeAccent, loadSavedThemeAccent } from '../lib/theme';
+import {
+  UNKNOWN_TRANSPORT_CAPABILITIES,
+  buildWeaponSlotsRuntime,
+  getPresetIndex,
+} from '../lib/presetLibrary';
+import { listSelectablePresets, pruneMissingAssignments } from '../lib/weaponSlots/presetIndex';
+import type { WeaponSlotsState, WeaponSlotStatus } from '../lib/weaponSlots/types';
+import { ShieldCheck, Cpu, Lock } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [config, setConfig] = useState<CrosshairConfig>(() => {
@@ -37,10 +49,131 @@ export const App: React.FC = () => {
   const [shareModalMode, setShareModalMode] = useState<'share' | 'import'>('share');
   const [currentAccent, setCurrentAccent] = useState<ThemeAccent>(loadSavedThemeAccent);
 
+  /* ---------------- Weapon Slot Crosshairs ---------------- */
+  const [weaponSlotsState, setWeaponSlotsState] = useState<WeaponSlotsState | null>(null);
+  const [weaponSlotStatus, setWeaponSlotStatus] = useState<WeaponSlotStatus | null>(null);
+  const [loadRepairs, setLoadRepairs] = useState<string[]>([]);
+  const [slotPulse, setSlotPulse] = useState(false);
+  const loadedRef = useRef(false);
+  const runtimeSaverRef = useRef(createDebouncedRuntimeSaver());
+
+  // The single preset index every part of the feature reads from. There is no
+  // second library: this is the vault + built-in pro presets + the user's saves.
+  const presetIndex = useMemo(() => getPresetIndex(customPresets), [customPresets]);
+  const selectablePresets = useMemo(() => listSelectablePresets(presetIndex), [presetIndex]);
+
+  // A stable string signature of the transport capabilities. Depending on the
+  // status object itself would make the runtime-push effect re-run on every
+  // status message and loop forever against the main process.
+  const capabilitiesKey = JSON.stringify(
+    weaponSlotStatus?.transport ?? UNKNOWN_TRANSPORT_CAPABILITIES,
+  );
+
   // Initialize and apply theme accent
   useEffect(() => {
     applyThemeAccent(currentAccent);
   }, [currentAccent]);
+
+  /* Load once, migrating and repairing whatever is on disk. */
+  useEffect(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
+
+    const { state: loaded, report } = loadWeaponSlotsState(presetIndex);
+    setWeaponSlotsState(loaded);
+    if (report.repairs.length > 0) setLoadRepairs(report.repairs);
+
+    // Put the indicator back to where the user left it.
+    const runtimeState = loadWeaponSlotsRuntimeState();
+    window.electronAPI?.restoreWeaponSlotActive?.({
+      slotId: runtimeState.activeSlotId,
+      presetId: runtimeState.activePresetId,
+      profileId: runtimeState.activeProfileId,
+    });
+
+    window.electronAPI
+      ?.getWeaponSlotStatus?.()
+      .then((status) => {
+        if (status) setWeaponSlotStatus(status);
+      })
+      .catch(() => undefined);
+    // Runs once on mount; `presetIndex` here is the library as loaded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* Push the resolved runtime to the main process whenever anything relevant changes. */
+  useEffect(() => {
+    if (!weaponSlotsState) return;
+    window.electronAPI?.applyWeaponSlotsRuntime?.(
+      buildWeaponSlotsRuntime(
+        weaponSlotsState,
+        presetIndex,
+        appSettings,
+        weaponSlotStatus?.transport ?? UNKNOWN_TRANSPORT_CAPABILITIES,
+      ),
+    );
+    // `capabilitiesKey` is the stable stand-in for the capabilities object.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weaponSlotsState, presetIndex, appSettings, capabilitiesKey]);
+
+  /* If a preset is deleted from the library, its slots become visibly unassigned. */
+  useEffect(() => {
+    if (!weaponSlotsState) return;
+    const { state: pruned, pruned: missing } = pruneMissingAssignments(
+      weaponSlotsState,
+      presetIndex,
+    );
+    if (missing.length === 0) return;
+
+    setWeaponSlotsState(pruned);
+    saveWeaponSlotsState(pruned);
+    setLoadRepairs((prev) => [
+      ...prev,
+      ...missing.map(
+        (m) =>
+          `Slot ${m.slotIndex} "${m.slotName}" in "${m.profileName}" referenced the deleted crosshair "${m.presetId}"; the assignment was cleared.`,
+      ),
+    ]);
+    // Only re-checked when the library itself changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetIndex]);
+
+  /* Status + switch notifications from the main process. */
+  useEffect(() => {
+    const offStatus = window.electronAPI?.onWeaponSlotStatus?.((status) => {
+      setWeaponSlotStatus(status);
+    });
+
+    const offSwitched = window.electronAPI?.onWeaponSlotSwitched?.((payload) => {
+      setSlotPulse(true);
+      window.setTimeout(() => setSlotPulse(false), 450);
+
+      // Remembered debounced — the switch itself never touches disk.
+      runtimeSaverRef.current.save({
+        activeProfileId: payload.profileId,
+        activeSlotId: payload.slotId,
+        activePresetId: payload.presetId,
+        lastSwitchAt: payload.at,
+      });
+    });
+
+    return () => {
+      offStatus?.();
+      offSwitched?.();
+      runtimeSaverRef.current.flush();
+    };
+  }, []);
+
+  const handleWeaponSlotsChange = useCallback((next: WeaponSlotsState) => {
+    setWeaponSlotsState(next);
+    saveWeaponSlotsState(next);
+  }, []);
+
+  const handleRecordingChange = useCallback((isRecording: boolean) => {
+    // While a capture field is listening, the press belongs to the recorder and
+    // must never also trigger a switch.
+    window.electronAPI?.setWeaponSlotRecording?.(isRecording);
+  }, []);
 
   const handleSelectAccent = (accent: ThemeAccent) => {
     setCurrentAccent(accent);
@@ -124,6 +257,8 @@ export const App: React.FC = () => {
           onSelectSubTab={setActiveSubTab}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
+          weaponSlotStatus={weaponSlotStatus}
+          weaponSlotPulse={slotPulse}
         />
 
         {/* View Routing */}
@@ -163,6 +298,30 @@ export const App: React.FC = () => {
                 saveAppSettings(next);
               }}
               currentConfig={config}
+              weaponSlotStatus={weaponSlotStatus}
+              onOpenWeaponSlots={() => setActiveView('weaponslots')}
+            />
+          )}
+
+          {activeView === 'weaponslots' && !weaponSlotsState && (
+            <div className="flex-1 flex items-center justify-center bg-surface-base">
+              <span className="text-xs text-zinc-500 font-mono animate-pulse">
+                Loading weapon-slot configuration…
+              </span>
+            </div>
+          )}
+
+          {activeView === 'weaponslots' && weaponSlotsState && (
+            <WeaponSlotsView
+              state={weaponSlotsState}
+              presetIndex={presetIndex}
+              selectablePresets={selectablePresets}
+              appSettings={appSettings}
+              status={weaponSlotStatus}
+              loadRepairs={loadRepairs}
+              onChange={handleWeaponSlotsChange}
+              onRecordingChange={handleRecordingChange}
+              onDismissRepairs={() => setLoadRepairs([])}
             />
           )}
 

@@ -35,11 +35,26 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const path = __importStar(require("path"));
+const weaponSlotService_1 = require("./services/weaponSlotService");
+/**
+ * Location of the Vite renderer bundle.
+ *
+ * After compilation this file lives at `dist-electron/electron/main.js`, so the
+ * renderer output at `<repo>/dist` is two levels up. Deriving it once here keeps
+ * the production `loadFile` paths correct if the build layout ever moves again.
+ */
+const RENDERER_DIST = path.join(__dirname, '..', '..', 'dist');
 let studioWindow = null;
 let overlayWindow = null;
+let weaponSlots = null;
 let isOverlayVisible = true;
 let currentConfig = null;
 const isDev = process.env.NODE_ENV === 'development';
+function send(channel, window, payload) {
+    if (window && !window.isDestroyed() && !window.webContents.isDestroyed()) {
+        window.webContents.send(channel, payload);
+    }
+}
 function createStudioWindow() {
     studioWindow = new electron_1.BrowserWindow({
         width: 1320,
@@ -59,10 +74,14 @@ function createStudioWindow() {
         studioWindow.loadURL('http://localhost:5173');
     }
     else {
-        studioWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+        studioWindow.loadFile(path.join(RENDERER_DIST, 'index.html'));
     }
+    // Weapon-slot switching needs to know when the user is inside crshhx itself.
+    studioWindow.on('focus', () => weaponSlots?.setStudioFocused(true));
+    studioWindow.on('blur', () => weaponSlots?.setStudioFocused(false));
     studioWindow.on('closed', () => {
         studioWindow = null;
+        weaponSlots?.setStudioFocused(false);
         // If studio is closed, we can keep overlay running or close if user quits
         if (process.platform !== 'darwin') {
             electron_1.app.quit();
@@ -102,8 +121,13 @@ function createOverlayWindow() {
         overlayWindow.loadURL('http://localhost:5173/overlay.html');
     }
     else {
-        overlayWindow.loadFile(path.join(__dirname, '../dist/overlay.html'));
+        overlayWindow.loadFile(path.join(RENDERER_DIST, 'overlay.html'));
     }
+    // A reload/refresh must not lose the crosshair the active slot selected.
+    overlayWindow.webContents.on('did-finish-load', () => {
+        if (currentConfig)
+            send('crosshair-updated', overlayWindow, currentConfig);
+    });
     overlayWindow.on('closed', () => {
         overlayWindow = null;
     });
@@ -143,10 +167,28 @@ function registerHotkeys(toggleKey = 'F10', cycleKey = 'F9') {
         console.warn(`Failed to register hotkey ${cycleKey}:`, err);
     }
 }
+function createWeaponSlotService() {
+    weaponSlots = new weaponSlotService_1.WeaponSlotSwitchService({
+        getOverlayWindow: () => overlayWindow,
+        getStudioWindow: () => studioWindow,
+        isOverlayVisible: () => isOverlayVisible,
+        sendToStudio: (channel, payload) => send(channel, studioWindow, payload),
+        sendToOverlay: (channel, payload) => {
+            // Remember what the overlay is showing so a reload of the overlay window
+            // (or a display change) restores the slot-selected crosshair rather than
+            // silently reverting to the designer's working copy.
+            if (channel === 'crosshair-updated')
+                currentConfig = payload;
+            send(channel, overlayWindow, payload);
+        },
+    });
+    weaponSlots.start();
+}
 electron_1.app.whenReady().then(() => {
     createOverlayWindow();
     createStudioWindow();
     registerHotkeys();
+    createWeaponSlotService();
     electron_1.app.on('activate', () => {
         if (electron_1.BrowserWindow.getAllWindows().length === 0) {
             createOverlayWindow();
@@ -155,6 +197,9 @@ electron_1.app.whenReady().then(() => {
     });
 });
 electron_1.app.on('will-quit', () => {
+    // Remove the global input hook before the process goes away.
+    weaponSlots?.dispose();
+    weaponSlots = null;
     electron_1.globalShortcut.unregisterAll();
 });
 electron_1.app.on('window-all-closed', () => {
@@ -198,3 +243,24 @@ electron_1.ipcMain.on('toggle-overlay', () => {
         overlayWindow.webContents.send('overlay-visibility-changed', isOverlayVisible);
     }
 });
+/* ------------------------------------------------------------------ *
+ * Weapon Slot Crosshairs IPC
+ * ------------------------------------------------------------------ */
+// The renderer owns persistence and the preset library; it pushes a resolved
+// runtime snapshot whenever either changes. This is not a hot path — it happens
+// on settings edits, never on a key press.
+electron_1.ipcMain.on('weapon-slots:apply-runtime', (_event, runtime) => {
+    if (!runtime || typeof runtime !== 'object')
+        return;
+    weaponSlots?.applyRuntime(runtime);
+});
+// While a key-capture field is listening, the press belongs to the recorder and
+// must never trigger a switch.
+electron_1.ipcMain.on('weapon-slots:set-recording', (_event, recording) => {
+    weaponSlots?.setRecording(!!recording);
+});
+electron_1.ipcMain.on('weapon-slots:restore-active', (_event, info) => {
+    if (info && typeof info === 'object')
+        weaponSlots?.restoreActiveSlot(info);
+});
+electron_1.ipcMain.handle('weapon-slots:get-status', () => weaponSlots?.getStatus() ?? null);

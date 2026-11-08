@@ -3,11 +3,16 @@
     "target": "ES2022",
     "module": "CommonJS",
     "moduleResolution": "node",
+    "rootDir": ".",
     "outDir": "dist-electron",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["electron/**/*"]
+  "include": [
+    "electron/**/*",
+    "src/lib/weaponSlots/**/*",
+    "src/types/**/*"
+  ]
 }
