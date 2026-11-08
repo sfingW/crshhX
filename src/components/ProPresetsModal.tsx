@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { CrosshairConfig } from '../types/crosshair';
 import { PRO_PRESETS } from '../lib/defaultPresets';
 import { ReticleRenderer } from './ReticleRenderer';
-import { X, Search, Plus, Trash2, Check, Trophy, Sparkles } from 'lucide-react';
+import { X, Search, Plus, Trash2, Check, Trophy } from 'lucide-react';
 
 interface ProPresetsModalProps {
   isOpen: boolean;

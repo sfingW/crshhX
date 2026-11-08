@@ -1,9 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.STORAGE_PROBE_PATH = exports.MIGRATED_STORAGE_KEYS = void 0;
+exports.STORAGE_PROBE_PATH = exports.MIGRATION_MARKER_NAME = exports.MIGRATED_STORAGE_KEYS = void 0;
 exports.planMigration = planMigration;
 exports.isMigrationEmpty = isMigrationEmpty;
 exports.describeMigration = describeMigration;
+exports.shouldRunMigration = shouldRunMigration;
+exports.markerContents = markerContents;
 exports.dumpScript = dumpScript;
 exports.injectScript = injectScript;
 exports.isStorageProbePath = isStorageProbePath;
@@ -98,6 +100,28 @@ function describeMigration(plan) {
     }
     parts.push('Nothing was deleted.');
     return parts.join(' ');
+}
+/* ------------------------------------------------------------------ *
+ * When to run at all
+ * ------------------------------------------------------------------ */
+/**
+ * Name of the marker file written into userData once a migration attempt has
+ * completed.
+ *
+ * Without it, every launch pays for two hidden windows and two storage probes
+ * even though the work can only ever be needed once. Startup time on a utility
+ * that people launch before a game matters; a stat() on one small file does not.
+ * The marker is written only when the attempt *completes* — a crash or timeout
+ * leaves it absent so the next launch retries rather than silently skipping.
+ */
+exports.MIGRATION_MARKER_NAME = 'storage-migration-v1.done';
+function shouldRunMigration(context) {
+    // Dev loads from the Vite server, whose origin this change never touched.
+    return !context.isDev && !context.markerExists;
+}
+/** What goes in the marker: enough for a support request to quote, nothing more. */
+function markerContents(report, now) {
+    return JSON.stringify({ completedAt: new Date(now).toISOString(), report }, null, 2);
 }
 /* ------------------------------------------------------------------ *
  * Scripts run inside the hidden windows

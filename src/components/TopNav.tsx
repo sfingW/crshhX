@@ -1,14 +1,6 @@
 import React from 'react';
 import { CrosshairConfig, AppSettings } from '../types/crosshair';
-import {
-  ShieldCheck,
-  Trophy,
-  Power,
-  Command,
-  Activity,
-  Cpu,
-  Layers,
-} from 'lucide-react';
+import { Trophy, Power, Activity } from 'lucide-react';
 
 interface TopNavProps {
   currentConfig: CrosshairConfig;

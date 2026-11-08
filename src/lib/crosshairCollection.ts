@@ -3,7 +3,7 @@ import { CrosshairConfig } from '../types/crosshair';
 function makeCrosshair(
   id: string,
   name: string,
-  category: 'pro' | 'tactical' | 'dots' | 'chevrons' | 'circles' | 'boxes' | 'novelty',
+  _category: 'pro' | 'tactical' | 'dots' | 'chevrons' | 'circles' | 'boxes' | 'novelty',
   game: 'valorant' | 'cs2' | 'fortnite' | 'apex' | 'universal',
   opts: Partial<CrosshairConfig>
 ): CrosshairConfig {

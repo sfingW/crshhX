@@ -169,3 +169,62 @@ A candidate replacement is Windows **Raw Input** (`RegisterRawInputDevices` with
 
 Until that spike exists, the current hook stays, and nothing in the product or
 its documentation claims it is safe with any particular anti-cheat.
+
+## Lightweight optimisation — what was measured and what changed
+
+All figures below are **measured** on this repository's build output unless
+labelled otherwise.
+
+| Change | Measured effect |
+| --- | --- |
+| Dropped legacy `.woff` fallbacks from the bundled fonts (`vite/fontFallbacks.ts`) | Renderer bundle 1,480,430 → 958,545 bytes (**−521,885**, −35%). The fallbacks existed for browsers this app cannot run in; Chromium has used woff2 throughout. |
+| Moved `react`, `react-dom`, `clsx`, `lucide-react`, `tailwind-merge` from dependencies to devDependencies | They are tree-shaken into `dist` by Vite; as runtime dependencies electron-builder copied ~57 MB of source into every install. App payload in the asar is now ≈1.27 MB (dist 958,545 + dist-electron 162,086 + win32-x64 hook 173,116 + manifest). |
+| Pruned uiohook-napi prebuilds for darwin/linux/win-arm64/win-ia32 | ~950 KB per download and install. The module degrades to the accelerator transport if its binary is absent, so a wrong prune costs a feature, not a crash. |
+| Studio window left at Chromium's default throttling | The studio has no work that must continue while a game is in front; an unfocused studio no longer runs timers and compositing at full rate. The overlay keeps `backgroundThrottling: false`, which it genuinely needs. |
+| Storage migration now runs at most once per install, through one reused probe window | First launch unchanged; every later launch skips two hidden windows and two storage probes for the cost of one `stat()`. A failed attempt writes no marker, so it retries. |
+| Removed 12 unused imports/locals; underscored one unused parameter | The renderer typecheck is now clean with **zero** errors, so CI runs it unfiltered instead of grepping known failures away. |
+
+### Declined, with reasons
+
+- **Splitting the overlay's CSS.** The overlay carries ~37 KB of Tailwind preflight
+  and utilities it does not use. Replacing it with hand-written rules would save
+  that, but the overlay is the one surface where a pixel-level regression is
+  unacceptable, and the saving is 2% of the payload. Not worth the risk.
+- **Lazy-loading the vault or the preset manager.** `App.tsx` builds the preset
+  index at startup because weapon-slot switching resolves presets by id from it.
+  Deferring the vault would delay a safety-critical path to save tens of
+  milliseconds of first paint. The brief forbids that trade explicitly.
+- **Re-splitting the renderer chunks.** The 258-preset vault is *not* in the chunk
+  the overlay loads (an earlier suspicion, disproved by inspecting the built
+  output: the only `novelty-` string in the shared chunk is a category matcher).
+  The overlay pulls React plus the renderer, which it needs.
+
+### What remains inherently large
+
+Electron itself. The runtime is on the order of a few hundred megabytes unpacked
+and tens of megabytes compressed; **this is an estimate**, not a measurement,
+because the sandbox cannot download the Windows distribution. The application's
+own contribution to that is the ≈1.27 MB measured above. Anyone evaluating
+"lightweight" should compare that 1.27 MB, not the runtime, against alternatives.
+
+## The Windows-native packaging workflow
+
+`.github/workflows/windows-release.yml` builds both artifacts on a Windows
+runner: a `quality` job (tests, both typechecks unfiltered, production build)
+gates a `package` job that runs `electron-builder --win`, prints measured sizes
+and SHA-256 hashes for the installer and the portable exe, and uploads both.
+
+It exists because that is the only environment where the toolchain downloads
+natively *and* `rcedit` can stamp the executable. Run it with **Actions →
+windows-release → Run workflow**, or push a `v*` tag.
+
+To build on a Windows machine directly:
+
+```bash
+npm ci
+npm run build
+npm run dist:win
+```
+
+Artifacts land in `release/`. No environment variables, no CA workarounds and no
+mirrors are needed outside the restricted sandbox.

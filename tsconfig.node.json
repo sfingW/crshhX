@@ -12,6 +12,7 @@
   },
   "include": [
     "electron/**/*",
+    "vite/**/*",
     "src/lib/weaponSlots/**/*",
     "src/types/**/*"
   ]

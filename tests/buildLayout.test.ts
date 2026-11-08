@@ -269,3 +269,101 @@ describe('build layout: optional native dependency is declared safely', () => {
     expect(src).not.toMatch(/\.keyToggle\(/);
   });
 });
+
+describe('footprint: nothing ships that the packaged app cannot use', () => {
+  it('bundles every renderer dependency, so the asar carries no node_modules but the hook', () => {
+    // react, react-dom, clsx, lucide-react and tailwind-merge are tree-shaken
+    // into dist by Vite; keeping them as runtime dependencies made electron-builder
+    // copy ~57 MB of source into every install.
+    expect(Object.keys((packageJson.dependencies ?? {}) as Record<string, string>)).toEqual([]);
+    const optional = (packageJson.optionalDependencies ?? {}) as Record<string, string>;
+    expect(Object.keys(optional)).toEqual(['uiohook-napi']);
+  });
+
+  it('proves the renderer bundle really contains React, so dropping it is safe', () => {
+    // If React ever stops being bundled, the assertion above would silently ship
+    // an app that cannot boot. Check the built output instead of trusting intent.
+    const assets = join(ROOT, 'dist', 'assets');
+    if (!existsSync(assets)) return; // build not run in this invocation
+    const scripts = readdirSync(assets).filter((f) => f.endsWith('.js'));
+    const bundled = scripts.some((f) =>
+      readFileSync(join(assets, f), 'utf8').includes('useState'),
+    );
+    expect(bundled).toBe(true);
+  });
+
+  it('ships only the Windows x64 native binary', () => {
+    expect(builderYmlSource()).toContain('!**/node_modules/uiohook-napi/prebuilds/darwin-*/**');
+    expect(builderYmlSource()).toContain('!**/node_modules/uiohook-napi/prebuilds/linux-*/**');
+    expect(builderYmlSource()).toContain('!**/node_modules/uiohook-napi/prebuilds/win32-arm64/**');
+  });
+
+  it('drops the legacy woff font fallbacks at build time', () => {
+    expect(readFileSync(join(ROOT, 'vite.config.ts'), 'utf8')).toContain('fontFallbackPlugin()');
+    const assets = join(ROOT, 'dist', 'assets');
+    if (!existsSync(assets)) return;
+    const woff = readdirSync(assets).filter((f) => f.endsWith('.woff'));
+    expect(woff).toEqual([]);
+    expect(readdirSync(assets).filter((f) => f.endsWith('.woff2')).length).toBeGreaterThan(0);
+  });
+
+  it('throttles the unfocused studio but never the overlay', () => {
+    // The studio has nothing that must run while a game is in front; the overlay
+    // would update its crosshair once a second if Chromium throttled it.
+    const studio = mainSource.slice(
+      mainSource.indexOf('function createStudioWindow'),
+      mainSource.indexOf('function createOverlayWindow'),
+    );
+    const overlay = mainSource.slice(
+      mainSource.indexOf('function createOverlayWindow'),
+      mainSource.indexOf('function registerHotkeys'),
+    );
+    expect(studio).not.toContain('backgroundThrottling');
+    expect(overlay).toContain('backgroundThrottling: false');
+  });
+
+  it('runs the storage migration at most once per install', () => {
+    expect(mainSource).toContain('MIGRATION_MARKER_NAME');
+    expect(mainSource).toContain('shouldRunMigration(');
+    // A failed attempt must not write the marker, or the retry never happens.
+    const start = mainSource.indexOf('async function migrateStorageOrigin');
+    const body = mainSource.slice(start, mainSource.indexOf('\n}\n', start));
+    const catchBlock = body.slice(body.indexOf('} catch (err) {'));
+    expect(catchBlock).not.toContain('markerContents');
+    expect(body).toContain('markerContents');
+  });
+});
+
+describe('packaging: the Windows release workflow is the sanctioned path', () => {
+  const workflow = readFileSync(join(ROOT, '.github', 'workflows', 'windows-release.yml'), 'utf8');
+
+  it('builds on a Windows runner, where the toolchain and rcedit actually work', () => {
+    expect(workflow).toContain('runs-on: windows-latest');
+    expect(workflow).toContain('electron-builder --win');
+  });
+
+  it('gates packaging behind the full quality job', () => {
+    expect(workflow).toContain('needs: quality');
+    expect(workflow).toContain('npm test');
+    expect(workflow).toContain('npx tsc -p tsconfig.json --noEmit');
+  });
+
+  it('reports measured sizes and hashes instead of letting anyone guess', () => {
+    expect(workflow).toContain('SHA256');
+    expect(workflow).toContain('Measure-Object');
+  });
+
+  it('uploads both executables and fails if there are none', () => {
+    expect(workflow).toContain('release/*.exe');
+    expect(workflow).toContain('if-no-files-found: error');
+  });
+
+  it('does not sign or publish, matching the stated decision', () => {
+    expect(workflow).toContain('--publish never');
+    expect(workflow).not.toContain('certificate');
+  });
+});
+
+function builderYmlSource(): string {
+  return readFileSync(join(ROOT, 'electron-builder.yml'), 'utf8');
+}

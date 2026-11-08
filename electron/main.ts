@@ -17,9 +17,12 @@ import {
 } from './services/rendererAssets';
 import { CSP_HEADER, contentSecurityPolicy } from './services/contentSecurity';
 import {
+  MIGRATION_MARKER_NAME,
   STORAGE_PROBE_PATH,
   describeMigration,
   isStorageProbePath,
+  markerContents,
+  shouldRunMigration,
   dumpScript,
   injectScript,
   legacyProbeHtml,
@@ -106,7 +109,11 @@ function createStudioWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      backgroundThrottling: false,
+      // Deliberately left at Chromium's default. The studio has no work that
+      // must continue while the user is in a game, so letting an unfocused
+      // studio throttle its timers and rendering is free idle CPU. The overlay
+      // is the opposite case and keeps throttling disabled, with a comment
+      // saying why.
     },
   });
 
@@ -152,6 +159,9 @@ function createOverlayWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      // Required. The overlay is unfocused whenever a game is in front, and a
+      // throttled overlay would update its crosshair at roughly one frame per
+      // second. This is the one window that must never be throttled.
       backgroundThrottling: false,
     },
   });
@@ -319,23 +329,23 @@ function registerContentSecurityPolicy() {
  * Storage migration: file:// origin -> app://crshhx
  * ------------------------------------------------------------------ */
 
-/** Opens a hidden window on `url`, runs `script`, and always cleans up. */
-async function runInHiddenWindow(url: string, script: string): Promise<unknown> {
-  const probe = new BrowserWindow({
+/**
+ * One hidden window, reused across origins.
+ *
+ * It exists only to touch `localStorage`, so it gets no preload and a sandbox.
+ * Navigating the same window from the legacy `file://` origin to `app://crshhx`
+ * is what makes a single window enough: each origin's storage is read while the
+ * document is on that origin.
+ */
+function createProbeWindow(): BrowserWindow {
+  return new BrowserWindow({
     show: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
-      // No preload: this window exists only to touch one origin's storage.
     },
   });
-  try {
-    await probe.loadURL(url);
-    return await probe.webContents.executeJavaScript(script, true);
-  } finally {
-    if (!probe.isDestroyed()) probe.destroy();
-  }
 }
 
 /**
@@ -346,30 +356,31 @@ async function runInHiddenWindow(url: string, script: string): Promise<unknown> 
  * never deletes the source, so a failed migration is recoverable by hand.
  */
 async function migrateStorageOrigin(): Promise<string> {
-  if (isDev) {
-    // Dev loads from the Vite server, whose origin this change does not touch.
-    return 'Development mode: storage origin unchanged, nothing to migrate.';
+  const markerPath = path.join(app.getPath('userData'), MIGRATION_MARKER_NAME);
+  if (!shouldRunMigration({ isDev, markerExists: existsSync(markerPath) })) {
+    return isDev
+      ? 'Development mode: storage origin unchanged, nothing to migrate.'
+      : 'Storage migration already completed on an earlier launch; skipped.';
   }
 
   const probePath = path.join(app.getPath('temp'), `crshhx-migration-${process.pid}.html`);
+  let probe: BrowserWindow | null = null;
   try {
+    probe = createProbeWindow();
     // 1. Read the legacy file:// origin. localStorage there is shared across
     //    file:// pages, so any file on disk will do; it is written to temp
     //    rather than shipped, so it is not reachable through app://.
     writeFileSync(probePath, legacyProbeHtml(), 'utf8');
-    const rawSource = await withTimeout(
-      runInHiddenWindow(pathToFileURL(probePath).toString(), dumpScript()),
-      MIGRATION_TIMEOUT_MS,
-      null,
-    );
+    const run = (url: string, script: string) =>
+      withTimeout(probe!.webContents.loadURL(url).then(() =>
+        probe!.webContents.executeJavaScript(script, true),
+      ), MIGRATION_TIMEOUT_MS, null);
+
+    const rawSource = await run(pathToFileURL(probePath).toString(), dumpScript());
     const source = parseJsonObject(rawSource);
 
     // 2. Read the destination origin, so nothing newer is overwritten.
-    const rawDestination = await withTimeout(
-      runInHiddenWindow(`${APP_ORIGIN}${STORAGE_PROBE_PATH}`, dumpScript()),
-      MIGRATION_TIMEOUT_MS,
-      null,
-    );
+    const rawDestination = await run(`${APP_ORIGIN}${STORAGE_PROBE_PATH}`, dumpScript());
     const destination = parseJsonObject(rawDestination);
 
     const plan = planMigration(source, destination);
@@ -377,11 +388,7 @@ async function migrateStorageOrigin(): Promise<string> {
 
     // 3. Write. The script re-checks each key, because the destination could
     //    have changed while the probes were open.
-    const rawWritten = await withTimeout(
-      runInHiddenWindow(`${APP_ORIGIN}${STORAGE_PROBE_PATH}`, injectScript(plan.toCopy)),
-      MIGRATION_TIMEOUT_MS,
-      null,
-    );
+    const rawWritten = await run(`${APP_ORIGIN}${STORAGE_PROBE_PATH}`, injectScript(plan.toCopy));
     const written = parseJsonObject({ written: String(rawWritten ?? '[]') }).written;
     const count = (() => {
       try {
@@ -392,12 +399,16 @@ async function migrateStorageOrigin(): Promise<string> {
       }
     })();
 
-    return `${describeMigration(plan)} Wrote ${count} key${count === 1 ? '' : 's'}.`;
+    const report = `${describeMigration(plan)} Wrote ${count} key${count === 1 ? '' : 's'}.`;
+    writeFileSync(markerPath, markerContents(report, Date.now()), 'utf8');
+    return report;
   } catch (err) {
-    // Deliberately not fatal. The old data is still under file://.
+    // Deliberately not fatal, and deliberately no marker: the next launch
+    // retries instead of silently skipping a migration that never finished.
     console.error('[crshhx] Storage migration failed; existing data was left untouched.', err);
     return `Migration did not complete (${String((err as Error)?.message ?? err)}). Nothing under the previous origin was modified.`;
   } finally {
+    if (probe && !probe.isDestroyed()) probe.destroy();
     try {
       if (existsSync(probePath)) unlinkSync(probePath);
     } catch {

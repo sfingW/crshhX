@@ -23,6 +23,15 @@ files:
   - package.json
   - '!**/*.map'
   - '!**/__tests__/**'
+  # uiohook-napi ships prebuilt binaries for nine platform/arch combinations and
+  # only the Windows x64 one can ever load in this package. Pruning the rest
+  # removes roughly 950 KB from every download and every install. The module
+  # degrades to the accelerator transport if its binary is missing, so a wrong
+  # prune here costs a feature, not a crash.
+  - '!**/node_modules/uiohook-napi/prebuilds/darwin-*/**'
+  - '!**/node_modules/uiohook-napi/prebuilds/linux-*/**'
+  - '!**/node_modules/uiohook-napi/prebuilds/win32-arm64/**'
+  - '!**/node_modules/uiohook-napi/prebuilds/win32-ia32/**'
 
 # Production node_modules are added by electron-builder automatically; the only
 # one this app requires at runtime is uiohook-napi (see below).

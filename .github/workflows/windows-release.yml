@@ -1,0 +1,101 @@
+# Windows release build.
+#
+# This workflow exists because the development sandbox cannot produce Windows
+# artifacts: it can reach github.com but not the release-asset CDN that serves
+# the NSIS compiler and the code-sign toolchain electron-builder downloads.
+# Packaging on a Windows runner removes that problem entirely — the toolchain
+# downloads natively, and rcedit can stamp the executable's icon and version
+# metadata, which a Linux build cannot do at all.
+#
+# Trigger it manually, or by pushing a tag like v1.0.0. It uploads exactly two
+# artifacts: the NSIS installer and the portable executable, each with its size
+# and SHA-256 printed in the log so a release page can quote measured numbers
+# instead of estimates.
+#
+# Nothing here signs the binaries. Code signing is a separate decision.
+
+name: windows-release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: windows-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  quality:
+    name: Tests, typechecks, production build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Tests, typechecks and the Vite build never launch Electron, so the
+      # ~100 MB binary download is skipped here.
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+      - name: Test suite
+        run: npm test
+
+      # Both typechecks are expected to be clean with no filtering. If a future
+      # change reintroduces unused imports, this fails rather than hiding them.
+      - name: Renderer typecheck
+        run: npx tsc -p tsconfig.json --noEmit
+
+      - name: Main-process typecheck
+        run: npm run typecheck:main
+
+      - name: Production build
+        run: npm run build
+
+  package:
+    name: Windows installer + portable
+    runs-on: windows-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # On Windows the Electron binary is required: electron-builder packs it
+      # into both artifacts.
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Production build
+        run: npm run build
+
+      - name: Build both Windows targets
+        run: npx electron-builder --win --publish never
+
+      - name: Report measured sizes and hashes
+        shell: pwsh
+        run: |
+          $installed = (Get-ChildItem -Recurse release/win-unpacked | Measure-Object -Property Length -Sum).Sum
+          "Installed (unpacked) size: {0:N0} bytes" -f $installed
+          Get-ChildItem release -Filter *.exe | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash
+            "{0}: {1:N0} bytes  sha256={2}" -f $_.Name, $_.Length, $hash
+          }
+
+      - name: Upload installer and portable executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: crshhx-windows-${{ github.ref_name }}
+          path: |
+            release/*.exe
+          if-no-files-found: error

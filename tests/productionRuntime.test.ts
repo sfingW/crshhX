@@ -21,6 +21,7 @@ import {
   allowsInlineScripts,
   contentSecurityPolicy,
 } from '../electron/services/contentSecurity';
+import { dropWoffFallbacks, fontFallbackPlugin, isFontSourceStylesheet } from '../vite/fontFallbacks';
 import {
   MIGRATED_STORAGE_KEYS,
   STORAGE_PROBE_PATH,
@@ -29,7 +30,9 @@ import {
   injectScript,
   isStorageProbePath,
   legacyProbeHtml,
+  markerContents,
   planMigration,
+  shouldRunMigration,
 } from '../electron/services/storageMigration';
 
 /**
@@ -362,5 +365,52 @@ describe('storage probe document', () => {
     expect(isStorageProbePath(STORAGE_PROBE_PATH)).toBe(true);
     expect(isStorageProbePath('/index.html')).toBe(false);
     expect(STORAGE_PROBE_PATH.startsWith('/')).toBe(true);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Startup and footprint optimisations
+ * ------------------------------------------------------------------ */
+
+describe('migration runs once per install', () => {
+  it('skips development and any launch after a completed attempt', () => {
+    expect(shouldRunMigration({ isDev: true, markerExists: false })).toBe(false);
+    expect(shouldRunMigration({ isDev: false, markerExists: true })).toBe(false);
+    expect(shouldRunMigration({ isDev: false, markerExists: false })).toBe(true);
+  });
+
+  it('records a quotable report in the marker', () => {
+    const contents = markerContents('Moved 3 saved items.', 1_700_000_000_000);
+    const parsed = JSON.parse(contents);
+    expect(parsed.report).toBe('Moved 3 saved items.');
+    expect(parsed.completedAt).toBe(new Date(1_700_000_000_000).toISOString());
+  });
+});
+
+describe('font fallback stripping', () => {
+  const source =
+    "@font-face{font-family:Inter;src:url(./files/a.woff2) format('woff2'), url(./files/a.woff) format('woff');}";
+
+  it('removes the legacy woff clause and keeps woff2', () => {
+    const next = dropWoffFallbacks(source);
+    expect(next).toContain("format('woff2')");
+    expect(next).not.toContain('.woff)');
+    expect(next).not.toContain("format('woff')");
+  });
+
+  it('leaves non-fontsource stylesheets alone', () => {
+    expect(isFontSourceStylesheet('/x/node_modules/@fontsource/inter/latin-400.css')).toBe(true);
+    expect(isFontSourceStylesheet('/x/src/index.css')).toBe(false);
+    expect(fontFallbackPlugin().transform(source, '/x/src/index.css')).toBeNull();
+    const out = fontFallbackPlugin().transform(
+      source,
+      '/x/node_modules/@fontsource/inter/latin-400.css',
+    );
+    expect(out?.code).not.toContain("format('woff')");
+  });
+
+  it('does not touch a rule that has no woff fallback', () => {
+    const woff2Only = "@font-face{src:url(./a.woff2) format('woff2');}";
+    expect(fontFallbackPlugin().transform(woff2Only, '/n/@fontsource/x/400.css')).toBeNull();
   });
 });

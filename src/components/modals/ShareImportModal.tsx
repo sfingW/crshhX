@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { CrosshairConfig } from '../../types/crosshair';
 import { exportValorantCode, parseValorantCode } from '../../lib/valorantParser';
 import { exportCS2Commands, parseCS2Commands } from '../../lib/cs2Parser';
-import { X, Copy, Check, Upload, Terminal } from 'lucide-react';
+import { X, Copy, Check } from 'lucide-react';
 
 interface ShareImportModalProps {
   isOpen: boolean;
@@ -28,7 +28,6 @@ export const ShareImportModal: React.FC<ShareImportModalProps> = ({
 
   const valorantCode = exportValorantCode(config);
   const cs2Commands = exportCS2Commands(config);
-  const jsonCode = JSON.stringify(config, null, 2);
 
   const handleCopy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
