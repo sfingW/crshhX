@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { ROUTES, SITE } from '../src/site';
+import type { ReleaseManifest } from '../src/site';
 import { ALL_PATHS, KNOWN_PATHS, hrefsIn, renderRoute } from './helpers';
+import data from '../src/releases.json';
+
+const manifest = data as unknown as ReleaseManifest;
 
 const HTML: Record<string, string> = Object.fromEntries(
   KNOWN_PATHS.map((path) => [path, renderRoute(path)]),
@@ -76,12 +80,36 @@ describe('link integrity', () => {
     }
   });
 
-  it('never links to an executable or an invented release asset', () => {
+  it('links executables only where the release manifest backs them', () => {
+    // The original rule — no page may link to an executable — existed because
+    // nothing was published, so any exe link was necessarily invented. Now the
+    // rule keeps its intent: an executable link is allowed if and only if it
+    // is byte-for-byte one of the URLs the manifest lists for a published
+    // release. With no published release, the set is empty and any exe link
+    // fails, exactly as before.
+    const backed = new Set<string>();
+    for (const entry of [...manifest.published, ...manifest.development]) {
+      for (const artifact of entry.artifacts ?? []) {
+        if (artifact.url) backed.add(artifact.url);
+      }
+    }
+    let seen = 0;
     for (const path of KNOWN_PATHS) {
       for (const href of hrefsIn(HTML[path])) {
-        expect(href, `${path} → ${href}`).not.toMatch(/\.(exe|msi|zip|dmg|AppImage)(\?|$)/i);
-        expect(href).not.toContain('/releases/download/');
+        const looksExecutable =
+          /\.(exe|msi|zip|dmg|AppImage)(\?|$)/i.test(href) ||
+          href.includes('/releases/download/');
+        if (!looksExecutable) continue;
+        seen += 1;
+        expect(backed.has(href), `${path} → ${href} is not a published manifest artifact`).toBe(
+          true,
+        );
       }
+    }
+    // And while a release is published, the download page must actually carry
+    // its links — a stale page hiding real files fails here.
+    if (manifest.channel === 'released' && manifest.latest) {
+      expect(seen, 'published release but no executable links rendered').toBeGreaterThan(0);
     }
   });
 

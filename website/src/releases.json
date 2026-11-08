@@ -1,13 +1,48 @@
 {
-  "channel": "unreleased",
-  "latest": null,
-  "published": [],
+  "channel": "released",
+  "latest": "1.1.0",
+  "published": [
+    {
+      "version": "1.1.0",
+      "date": "2026-11-08",
+      "status": "published",
+      "summary": "First published Windows build. One-click installer or portable executable — both keep your crosshair library in your roaming profile, so updating never touches your data.",
+      "added": [
+        "Target Monitor selection: put the overlay on any connected display. The choice survives restarts, and the overlay repositions on hotplug, resolution and scaling changes.",
+        "Background operation: closing the window hides crshhx to the system tray while overlays, global hotkeys and weapon-slot switching keep running. Quitting is explicit, from the tray menu.",
+        "Pro Crosshairs library: 40 curated designs across 8 categories, built into the existing preset system, with an interactive preview bench — backdrops, zoom, colour and size overrides, two-design compare.",
+        "Crosshair Academy: 10 tutorials with live in-app demos, labelled illustrations and tracked completion.",
+        "One-click Windows installer and a portable executable."
+      ],
+      "improved": [
+        "One clean window header: the duplicate native title bar and the File/Edit/View menu bar are gone; clipboard, undo, zoom and DevTools shortcuts still work.",
+        "The installer now installs with no prompts. Your data lives outside the install folder, and uninstalling never deletes it."
+      ],
+      "fixed": [
+        "The header's minimise, maximise and close buttons were decorative; they now control the window, and close still respects the close-to-tray setting."
+      ],
+      "artifacts": [
+        {
+          "file": "crshhx-crosshair-studio-setup-1.1.0.exe",
+          "url": "https://github.com/sfingW/crshhX/releases/download/v1.1.0/crshhx-crosshair-studio-setup-1.1.0.exe",
+          "size": 88862700,
+          "sha256": "bed1e654a6ce8dc0226c77fd8872da848e2d0a2f3eba6bb7dd104084dccac45d"
+        },
+        {
+          "file": "crshhx-crosshair-studio-portable-1.1.0.exe",
+          "url": "https://github.com/sfingW/crshhX/releases/download/v1.1.0/crshhx-crosshair-studio-portable-1.1.0.exe",
+          "size": 81455085,
+          "sha256": "037476deef04f4a56de5a58860dc7c61e80a9c8abab078c183d63a0e8ba842e2"
+        }
+      ]
+    }
+  ],
   "development": [
     {
       "version": "1.0.0",
       "date": "2026-11-08",
-      "status": "unreleased",
-      "summary": "First release candidate in development. Everything below is in the repository and covered by 1,061 automated tests; no Windows executable has been published yet.",
+      "status": "development",
+      "summary": "Development notes for the 1.0.0 milestone. Everything below is in the repository and was covered by 1,061 automated tests at the time; it all shipped as part of the 1.1.0 release above.",
       "added": [
         "Weapon-slot crosshairs: record a key per slot and switch reticles mid-game without touching the game process.",
         "Crosshair editor with per-arm length and thickness, whole-reticle rotation and scale, inner outline, colour tools with contrast verdicts, undo history and an A/B compare panel.",

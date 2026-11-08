@@ -766,3 +766,46 @@
 .feature-list li::before {
   background: var(--line-strong);
 }
+
+/* Download hero call to action: one primary button, one quiet secondary link,
+   plain facts in between. Deliberately flat — same language as the dl-cards. */
+.dl-hero-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: 32px;
+}
+
+.dl-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 0;
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-dim);
+}
+
+.dl-hero-meta span + span::before {
+  content: "·";
+  margin: 0 10px;
+  color: var(--text-faint);
+}
+
+.dl-portable-link {
+  font-size: 0.9375rem;
+  color: var(--text-dim);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.dl-portable-link:hover {
+  color: var(--text);
+}
+
+.dl-smartscreen {
+  margin: 0;
+  max-width: 62ch;
+  font-size: 0.8125rem;
+  color: var(--text-faint);
+}

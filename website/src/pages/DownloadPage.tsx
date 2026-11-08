@@ -3,6 +3,7 @@ import { Callout, SectionHead } from '../components/Blocks';
 import { Reveal } from '../components/Reveal';
 import { IconArrow, IconDownload, IconFolders } from '../components/icons';
 import type { ReleaseArtifact, ReleaseEntry, ReleaseManifest } from '../site';
+import { isDownloadable, latestPublishedEntry, pickArtifact } from '../site';
 import data from '../releases.json';
 
 const manifest = data as unknown as ReleaseManifest;
@@ -11,25 +12,10 @@ const manifest = data as unknown as ReleaseManifest;
  * The download system reads from `src/releases.json`. Until a verified Windows
  * build exists, `latest` is null and this page renders the Coming Soon state:
  * no link, no fabricated size, no invented date. The moment the manifest names
- * a published release with real artifacts, the same cards turn into direct
- * file links — clicking the button downloads the `.exe` itself, not a page
- * about it and not a zip of something else.
+ * a published release with real artifacts, the page turns into direct file
+ * links — clicking a button downloads the `.exe` itself, not a page about it
+ * and not a zip of something else.
  */
-
-/** Finds the artifact for one distribution by the shape of its filename. */
-function pickArtifact(
-  entry: ReleaseEntry | undefined,
-  kind: 'setup' | 'portable',
-): ReleaseArtifact | null {
-  if (!entry) return null;
-  const pattern = kind === 'setup' ? /setup/i : /portable/i;
-  return entry.artifacts?.find((artifact) => pattern.test(artifact.file)) ?? null;
-}
-
-/** True only when the file itself is published and verified with a URL. */
-function isDownloadable(artifact: ReleaseArtifact | null): boolean {
-  return Boolean(artifact?.url);
-}
 
 /**
  * The download call to action. A published artifact renders as a real anchor
@@ -68,7 +54,7 @@ function MetaList({
   entry,
   artifact,
 }: {
-  entry: ReleaseEntry | undefined;
+  entry: ReleaseEntry | null;
   artifact: ReleaseArtifact | null;
 }) {
   const live = isDownloadable(artifact);
@@ -91,12 +77,14 @@ function MetaList({
 }
 
 export function DownloadPage() {
-  const latestEntry = manifest.latest
-    ? manifest.published.find((entry) => entry.version === manifest.latest)
-    : undefined;
+  const latestEntry = latestPublishedEntry(manifest);
   const installer = pickArtifact(latestEntry, 'setup');
   const portable = pickArtifact(latestEntry, 'portable');
   const anythingLive = isDownloadable(installer) || isDownloadable(portable);
+  const sizeLabel = (artifact: ReleaseArtifact | null) =>
+    typeof artifact?.size === 'number'
+      ? `${(artifact.size / 1048576).toFixed(1)} MB`
+      : '';
 
   return (
     <>
@@ -108,6 +96,28 @@ export function DownloadPage() {
             title="crshhx for Windows"
             lead="Two distributions: a one-click installer and a single portable executable. Both store your library in your roaming profile, so moving or updating the application never touches your crosshairs."
           />
+          {anythingLive && installer?.url && portable?.url ? (
+            <div className="dl-hero-cta">
+              <a className="btn btn-primary" href={installer.url} download={installer.file}>
+                <IconDownload />
+                Download for Windows
+              </a>
+              <p className="dl-hero-meta">
+                <span>Version {latestEntry?.version}</span>
+                <span>{sizeLabel(installer)}</span>
+                <span>Windows 10 &amp; 11 · 64-bit</span>
+                <span>One-click install — recommended</span>
+              </p>
+              <a className="dl-portable-link" href={portable.url} download={portable.file}>
+                Download portable version
+              </a>
+              <p className="dl-smartscreen">
+                The portable build needs no installation. The application is not code-signed,
+                so Windows SmartScreen may warn on first run: choose “More info”, then “Run
+                anyway”.
+              </p>
+            </div>
+          ) : null}
           {anythingLive ? (
             <Callout tone="info" title="Installing takes one double-click">
               <p>

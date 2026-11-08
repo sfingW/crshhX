@@ -120,3 +120,31 @@ export interface ReleaseManifest {
   /** Repository changes that are not part of any downloadable build. */
   development: ReleaseEntry[];
 }
+
+/* ------------------------------------------------------- release lookups */
+
+/**
+ * The entry `latest` names, but only when it is genuinely published. Pages use
+ * this to decide between honest "coming soon" copy and real download links —
+ * a null here means nothing is downloadable, anywhere on the site.
+ */
+export function latestPublishedEntry(manifest: ReleaseManifest): ReleaseEntry | null {
+  if (manifest.channel !== 'released' || !manifest.latest) return null;
+  const entry = manifest.published.find((candidate) => candidate.version === manifest.latest);
+  return entry && entry.status === 'published' ? entry : null;
+}
+
+/** Finds the artifact for one distribution by the shape of its filename. */
+export function pickArtifact(
+  entry: ReleaseEntry | null,
+  kind: 'setup' | 'portable',
+): ReleaseArtifact | null {
+  if (!entry) return null;
+  const pattern = kind === 'setup' ? /setup/i : /portable/i;
+  return entry.artifacts?.find((artifact) => pattern.test(artifact.file)) ?? null;
+}
+
+/** True only when the file itself is published and verified with a URL. */
+export function isDownloadable(artifact: ReleaseArtifact | null): boolean {
+  return Boolean(artifact?.url);
+}

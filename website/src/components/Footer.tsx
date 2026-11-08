@@ -1,6 +1,12 @@
 import { Link } from 'react-router-dom';
 import { NAV_LINKS, SITE } from '../site';
+import type { ReleaseManifest } from '../site';
+import { latestPublishedEntry } from '../site';
+import data from '../releases.json';
 import { BrandMark } from './Brand';
+
+const manifest = data as unknown as ReleaseManifest;
+const latestEntry = latestPublishedEntry(manifest);
 
 export function Footer() {
   const year = Number(SITE.updated.slice(0, 4));
@@ -50,7 +56,11 @@ export function Footer() {
           <span>
             © {year} {SITE.productName}. Windows 10 and 11, 64-bit.
           </span>
-          <span className="pill pending">v1.0.0 in development — not yet released</span>
+          {latestEntry ? (
+            <span className="pill ok">{`v${latestEntry.version} — released ${latestEntry.date}`}</span>
+          ) : (
+            <span className="pill pending">v1.0.0 in development — not yet released</span>
+          )}
         </div>
       </div>
     </footer>

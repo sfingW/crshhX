@@ -78,6 +78,12 @@ describe('server-rendered content', () => {
     expect(html).toContain('href="/features"');
     expect(html).toContain('How it works');
     expect(html).toContain('No telemetry');
+    // The published build turns the hero CTA into the file itself — no
+    // intermediate page between the visitor and the installer.
+    expect(html).toContain(
+      'href="https://github.com/sfingW/crshhX/releases/download/v1.1.0/crshhx-crosshair-studio-setup-1.1.0.exe"',
+    );
+    expect(html).toContain('is ready for Windows');
   });
 
   it('covers all six feature areas on the features page', () => {
@@ -91,21 +97,39 @@ describe('server-rendered content', () => {
     expect(html).toContain('none of them is a screenshot');
   });
 
-  it('keeps the download page in an honest Coming Soon state', () => {
+  it('publishes the real download facts on the download page', () => {
     const html = HTML['/download'];
-    expect(html).toContain('No verified build has been published yet');
-    expect(html).toContain('coming soon');
+    // The requested call-to-action pair: one primary button, one small link.
+    expect(html).toContain('Download for Windows');
+    expect(html).toContain('Download portable version');
+    // Both point straight at the GitHub Release assets — the files themselves.
+    expect(html).toContain(
+      'href="https://github.com/sfingW/crshhX/releases/download/v1.1.0/crshhx-crosshair-studio-setup-1.1.0.exe"',
+    );
+    expect(html).toContain(
+      'href="https://github.com/sfingW/crshhX/releases/download/v1.1.0/crshhx-crosshair-studio-portable-1.1.0.exe"',
+    );
+    // Measured facts from the release metadata: version, sizes, hashes.
+    expect(html).toContain('1.1.0');
+    expect(html).toContain('2026-11-08');
+    expect(html).toContain('84.7 MB');
+    expect(html).toContain('77.7 MB');
+    expect(html).toContain('bed1e654a6ce8dc0226c77fd8872da848e2d0a2f3eba6bb7dd104084dccac45d');
+    expect(html).toContain('037476deef04f4a56de5a58860dc7c61e80a9c8abab078c183d63a0e8ba842e2');
+    // The unsigned-build warning is stated plainly.
+    expect(html).toContain('SmartScreen');
+    // Structure unchanged.
     expect(html).toContain('System requirements');
     expect(html).toContain('Windows 10 or Windows 11');
     expect(html).toContain('SHA-256');
     expect(html).toContain('Installing');
     expect(html).toContain('Troubleshooting');
     expect(html).toContain('href="/changelog"');
-    // Both distribution cards show dashes for version, date, size and hash.
-    expect(html.match(/<dd>—<\/dd>/g)?.length).toBe(8);
-    // Two disabled buttons, and no link that pretends to be a download.
-    expect(html.match(/disabled=""/g)?.length).toBe(2);
-    expect(html).not.toMatch(/href="[^"]*\.exe/i);
+    // Nothing from the pending state may survive, and no fact cell is a dash.
+    expect(html).not.toContain('No verified build has been published yet');
+    expect(html).not.toContain('coming soon');
+    expect(html).not.toContain('disabled');
+    expect(html).not.toContain('<dd>—</dd>');
     expect(html).not.toContain('Download now');
   });
 
@@ -132,15 +156,21 @@ describe('server-rendered content', () => {
 
   it('separates development notes from published releases on the changelog', () => {
     const html = HTML['/changelog'];
-    expect(html).toContain('No published release yet');
+    // The published release leads, with its measured artifacts as plain chips.
+    expect(html).toContain('Published releases');
+    expect(html).toContain('1.1.0');
+    expect(html).toContain('pill ok">published');
+    expect(html).toContain('crshhx-crosshair-studio-setup-1.1.0.exe');
+    // Development notes stay in their own section, visibly not a release.
     expect(html).toContain('In development');
-    expect(html).toContain('v1.0.0');
-    expect(html).toContain('unreleased');
+    expect(html).toContain('1.0.0');
+    expect(html).toContain('development note');
+    expect(html).toContain('tl-entry unpublished');
+    expect(html).not.toContain('No published release yet');
     expect(html).toContain('Added');
     expect(html).toContain('Improved');
     expect(html).toContain('Fixed');
-    expect(html).toContain('tl-entry unpublished');
-    expect(html).not.toContain('pill ok">published');
+    // Chips name the files; only the download page links to them.
     expect(html).not.toMatch(/href="[^"]*\.exe/i);
   });
 
