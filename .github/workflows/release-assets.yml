@@ -1,29 +1,41 @@
 name: Attach release assets
 
-# When a GitHub Release is published, find the windows-release run that
-# packaged that tag, download its artifact and attach the two executables to
-# the release.
+# Attaches the packaged executables to a GitHub Release.
 #
 # Why this exists: GitHub's artifact and release-asset CDNs are unreachable
-# from the development sandbox, and its token cannot dispatch workflows, so
-# the bytes can only travel inside GitHub's own network. Assets are therefore
-# always exactly what the packaging run produced and hashed — never rebuilt,
-# never the artifact zip, never uploaded by hand.
+# from the development sandbox, and its token can neither dispatch workflows
+# nor fire `release` events (events created by an integration token are
+# excluded from triggering Actions). The bytes can only travel inside
+# GitHub's own network, so this job does the transfer — assets are always
+# exactly what the windows-release packaging run produced and hashed, never
+# rebuilt, never the artifact zip, never uploaded by hand.
 #
-# Guards: the packaging run must have succeeded for this tag, the release must
-# not already carry assets (attach exactly once, never duplicate or
-# overwrite), and the artifact must contain exactly the two expected
-# executables. Sizes and SHA-256 are printed to this run's log before upload.
+# Triggers:
+#   - release published: attaches to that release (fails loudly if it already
+#     carries assets — attach exactly once, never duplicate or overwrite);
+#   - a push to main that changes THIS file: the bootstrap path. Releases
+#     created by the integration token fire no event, so merging a change to
+#     this workflow runs the attach against the latest release. If that
+#     release already has its assets, the job exits quietly — it is a no-op,
+#     not a failure.
+#
+# Either way: the packaging run for the tag must have succeeded, and the
+# artifact must contain exactly the two expected executables. Sizes and
+# SHA-256 are printed to the log before upload.
 
 on:
   release:
     types: [published]
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/release-assets.yml'
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-assets-${{ github.event.release.tag_name }}
+  group: release-assets
   cancel-in-progress: false
 
 jobs:
@@ -33,11 +45,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Resolve the packaging run for ${{ github.event.release.tag_name }}
+      - name: Resolve the target release
+        id: target
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          if [ -n "$EVENT_TAG" ]; then
+            TAG="$EVENT_TAG"
+          else
+            # Bootstrap push: the latest release is the attach target.
+            TAG=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq '.tagName')
+          fi
+          if [ -z "$TAG" ]; then
+            echo "No release to attach to." >&2
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Target release: $TAG"
+
+      - name: Resolve the packaging run
         id: packaging
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.event.release.tag_name }}
+          TAG: ${{ steps.target.outputs.tag }}
         run: |
           set -euo pipefail
           RUN_ID=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow windows-release.yml \
@@ -53,7 +85,7 @@ jobs:
       - name: Download the packaged executables
         uses: actions/download-artifact@v4
         with:
-          name: crshhx-windows-${{ github.event.release.tag_name }}
+          name: crshhx-windows-${{ steps.target.outputs.tag }}
           run-id: ${{ steps.packaging.outputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: artifacts
@@ -61,7 +93,8 @@ jobs:
       - name: Verify and attach
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.event.release.tag_name }}
+          TAG: ${{ steps.target.outputs.tag }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
 
@@ -69,13 +102,15 @@ jobs:
           SETUP="crshhx-crosshair-studio-setup-${VERSION}.exe"
           PORTABLE="crshhx-crosshair-studio-portable-${VERSION}.exe"
 
-          # Attach exactly once: a release that already carries assets stops
-          # the job rather than duplicating or overwriting anything.
           EXISTING=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
             --json assets --jq '.assets | length')
           if [ "$EXISTING" != "0" ]; then
-            echo "Release $TAG already carries $EXISTING asset(s); refusing to duplicate." >&2
-            exit 1
+            if [ "$EVENT_NAME" = "release" ]; then
+              echo "Release $TAG already carries $EXISTING asset(s); refusing to duplicate." >&2
+              exit 1
+            fi
+            echo "Release $TAG already carries its $EXISTING asset(s); nothing to attach."
+            exit 0
           fi
 
           test -f "artifacts/$SETUP"
