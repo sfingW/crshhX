@@ -27,7 +27,13 @@ import {
   type PresetLibraryState,
   type PresetView,
 } from '../src/lib/presetOrganizer';
-import { loadPresetLibrary, savePresetLibrary } from '../src/lib/storage';
+import {
+  loadFavoriteIds,
+  loadPresetLibrary,
+  saveFavoriteIds,
+  savePresetLibrary,
+  toggleFavoriteId,
+} from '../src/lib/storage';
 import { fakePreset } from './helpers';
 
 /**
@@ -658,8 +664,70 @@ describe('persistence round trip', () => {
     expect(loaded).toEqual(withData);
   });
 
-  it('starts empty when nothing has been saved', () => {
-    expect(loadPresetLibrary()).toEqual({ state: emptyLibrary(), repairs: [] });
+  // A first run seeds the three starter favourites, so the vault's star list and
+  // the manager's Favourites scope begin by agreeing. Reading is therefore not a
+  // pure read on the very first call — but it is stable and idempotent after it.
+  it('seeds the starter favourites on a genuine first run, once', () => {
+    const first = loadPresetLibrary();
+    expect(first.repairs).toEqual([]);
+    expect(Object.keys(first.state.entries).sort()).toEqual(['pro-1', 'pro-11', 'pro-2']);
+    expect(Object.values(first.state.entries).every((entry) => entry.favourite)).toBe(true);
+
+    // Persisted, so a reload sees the same thing rather than re-seeding.
+    expect(loadPresetLibrary().state).toEqual(first.state);
+    expect(localStorage.getItem('crshhx_preset_library')).toBeTruthy();
+  });
+
+  it('does not re-seed once the user has chosen to have no favourites', () => {
+    savePresetLibrary(emptyLibrary());
+    const { state } = loadPresetLibrary();
+    expect(state.entries).toEqual({});
+  });
+
+  it('migrates an older crshhx_favorites list into the library and drops the old key', () => {
+    localStorage.setItem('crshhx_favorites', JSON.stringify(['pro-5', 'custom-1']));
+    const { state, repairs } = loadPresetLibrary();
+
+    expect(state.entries['pro-5'].favourite).toBe(true);
+    expect(state.entries['custom-1'].favourite).toBe(true);
+    expect(repairs.join(' ')).toMatch(/Moved 2 favourite crosshairs/);
+    // One-way: the legacy key is gone, so this cannot run twice or diverge.
+    expect(localStorage.getItem('crshhx_favorites')).toBeNull();
+    expect(loadPresetLibrary().repairs).toEqual([]);
+  });
+
+  it('keeps favourites already in the library when migrating an older list', () => {
+    savePresetLibrary(setFavourite(emptyLibrary(), 'pro-9', true));
+    localStorage.setItem('crshhx_favorites', JSON.stringify(['pro-5']));
+    const { state } = loadPresetLibrary();
+    expect(state.entries['pro-9'].favourite).toBe(true);
+    expect(state.entries['pro-5'].favourite).toBe(true);
+  });
+
+  it('survives an unreadable legacy list without losing the library', () => {
+    savePresetLibrary(setFavourite(emptyLibrary(), 'pro-9', true));
+    localStorage.setItem('crshhx_favorites', '{not json');
+    const { state } = loadPresetLibrary();
+    expect(state.entries['pro-9'].favourite).toBe(true);
+    expect(localStorage.getItem('crshhx_favorites')).toBeNull();
+  });
+
+  it('agrees with the vault about which crosshairs are favourites', () => {
+    toggleFavoriteId('pro-7');
+    expect(loadFavoriteIds()).toContain('pro-7');
+    expect(loadPresetLibrary().state.entries['pro-7'].favourite).toBe(true);
+
+    // And the manager's own write is visible to the vault.
+    savePresetLibrary(setFavourite(loadPresetLibrary().state, 'pro-8', true));
+    expect(loadFavoriteIds()).toContain('pro-8');
+  });
+
+  it('saveFavoriteIds replaces the whole set rather than adding to it', () => {
+    saveFavoriteIds(['pro-1', 'pro-2', 'pro-3']);
+    saveFavoriteIds(['pro-4']);
+    expect(loadFavoriteIds()).toEqual(['pro-4']);
+    // The un-starred ones keep their entry but lose the flag.
+    expect(loadPresetLibrary().state.entries['pro-1'].favourite).toBe(false);
   });
 
   it('recovers from a corrupt blob and says the crosshairs are safe', () => {

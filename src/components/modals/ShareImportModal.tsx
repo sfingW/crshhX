@@ -152,6 +152,12 @@ export const ShareImportModal: React.FC<ShareImportModalProps> = ({
               <p className="text-zinc-400 text-xs">
                 Paste any official Valorant crosshair code (0;P;...), CS2 console snippet (cl_crosshair...), or JSON to load it:
               </p>
+              <p className="text-zinc-500 text-[10.5px] leading-relaxed">
+                This applies one crosshair to what you are currently editing. To bring in a crshhx
+                file with many crosshairs, folders, settings or weapon-slot profiles, use
+                Preset Manager → Import file — that route previews the whole file before changing
+                anything.
+              </p>
               <textarea
                 rows={4}
                 value={importText}

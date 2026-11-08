@@ -253,6 +253,15 @@ export const App: React.FC = () => {
 
   /* ---------------- Preset manager ---------------- */
 
+  /* The vault writes favourites straight to storage while this component holds
+   * its own copy, so the copy is re-read on every view change. Everything is
+   * saved synchronously, so this cannot discard unsaved work — and without it,
+   * starring a crosshair in the vault and then opening the manager would show
+   * the old state, and the manager's next write would undo the star. */
+  useEffect(() => {
+    setPresetLibrary(loadPresetLibrary().state);
+  }, [activeView]);
+
   const commitLibrary = useCallback((next: PresetLibraryState) => {
     setPresetLibrary(next);
     savePresetLibrary(next);

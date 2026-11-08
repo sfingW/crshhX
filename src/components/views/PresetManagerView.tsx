@@ -541,6 +541,7 @@ export const PresetManagerView: React.FC<PresetManagerViewProps> = ({
           <button
             type="button"
             onClick={onImportFile}
+            title="Import a crshhx file: many crosshairs, folders, settings and weapon slots"
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-medium text-black transition-colors"
             style={{ backgroundColor: 'var(--brand-accent)' }}
           >
@@ -548,6 +549,15 @@ export const PresetManagerView: React.FC<PresetManagerViewProps> = ({
             Import file
           </button>
         </div>
+
+        {/* There is another, deliberately different import in the top bar, so
+            both say what they are for. Pasting a Valorant or CS2 code applies
+            one crosshair to the editor; this one brings in a file. */}
+        <p className="px-4 pt-2 text-[10px] text-zinc-600 leading-relaxed">
+          Export and import work on crshhx files — many crosshairs at once, with their folders, and
+          optionally your settings and weapon-slot profiles. To paste a single Valorant or CS2
+          crosshair code instead, use Share in the top bar.
+        </p>
 
         {/* Rows */}
         <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-3">
