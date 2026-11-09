@@ -47,7 +47,7 @@ export const ROUTES: readonly RouteMeta[] = [
     label: 'Download',
     title: 'Download — crshhx for Windows',
     description:
-      'Download crshhx for Windows 10 and 11 (64-bit). No verified build has been published yet: this page lists the system requirements and will carry the installer and portable executables, with sizes and SHA-256, once a real build exists.',
+      'Download crshhx for Windows 10 and 11 (64-bit). The page lists the current release — an installer and a portable executable — with measured sizes, SHA-256 checksums, installation steps and system requirements, straight from the release manifest.',
   },
   {
     path: '/docs',
