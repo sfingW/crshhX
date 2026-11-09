@@ -1471,3 +1471,85 @@ to emit a flat `features.html` beside each directory index, or add a `_redirects
 All work is on `arena/349e1219-crshhx`, branched from `4ecedfc`. Nothing was pushed to `main`,
 no release was created, and no production deployment was made. Pull request #10 is open for
 review; merging, releasing and deploying wait for the owner's approval.
+
+> **Addendum, 2026-11-09.** The paragraph above records the state *while stage 2 was in
+> review*, and events have since overtaken it: PR #10 was squash-merged into `main` as
+> `48634ce` with the owner's approval, all checks green, and Cloudflare Pages deployed that
+> commit to production the same day (`Deploy successful!`, deployment `d62c5bd5`). Production
+> now serves this redesign; the verification of that deploy (seven-route sitemap with
+> `lastmod 2026-11-09`, the previously-nonexistent `/academy` live on the alias, download
+> hashes matching the release API byte for byte) is recorded in the PR thread rather than
+> here. Nothing about the application release changed: v1.1.0 remains the only published
+> Windows build.
+
+## 21. Gold Series (stage 3): two fan recreations, and the segmented ring they required
+
+### 21.1 What shipped
+
+Two designs, measured pixel-by-pixel from owner-supplied reference imagery and rebuilt as
+genuine configs in the application's own schema — not images, not approximations:
+
+* **Arc Crown** (`pc-gold-arc-crown`): four vermilion (`#dc583e`) arcs of 40° each, centred on
+  the diagonals with butt caps and open cardinals, ring radius 28 at thickness 4 (the
+  reference's 1 : 0.145 stroke ratio), around a green (`#28f953`) circular centre dot.
+* **Compact Mark** (`pc-gold-compact-mark`): a monochrome green (`#6af469`) cross, arms 12 at
+  thickness 4 with gap 5 — the reference's 1 : 1.27 : 2.98 ratio in integers — hollow centre,
+  no outline, no dot, exactly as the reference shows.
+
+Both are tier `inspired`, category `gold`, `series: 'gold'`, each carrying an `inspiration`
+attribution that names them as fan recreations of MrSavage reference imagery, not official
+presets, implying no endorsement. The website renders that attribution on every surface that
+shows a design; a data test refuses a gold entry without it.
+
+### 21.2 The engine extension (schema v3)
+
+Arc Crown could not be drawn by the renderer as it stood: the ring was a complete SVG
+`<circle>`. Rather than fake segments with dashes or four rotated arms, three optional fields
+were added — `circleSegments`, `circleArcSpan`, `circleArcOffset` — with neutral defaults
+(`1 / 360 / 0`) that reproduce the historical complete circle exactly, so every config saved
+before v3 normalises without a single repair and renders unchanged. `ringArcs()` and
+`arcPath()` in `ReticleRenderer.tsx` are the single source of the geometry; a segmented ring
+turns with `rotation` (a complete circle stays rotation-invariant, as before), and the
+Designer gained three controls under the ring toggle. The website's mirror renderer
+(`website/src/components/Reticle.tsx`) implements the same convention, and the extractor maps
+the fields into the preview spec only when a design actually segments, keeping all forty
+existing entries byte-identical in `catalogue.json`.
+
+### 21.3 Presentation
+
+The Gold Series sits in its own band between the honesty callout and the standard sheet, on a
+dark plate (`--gold-plate #101114`) with metallic gold type (`--gold #d8b25c` at 9.39:1,
+`--gold-bright #e8cd8a` at 12.16:1, both gated) and a `--gold-line #8a6f35` hairline used for
+borders only (3.96:1, never text). Motion is transform/opacity/grid-rows only: an entrance
+through the existing `Reveal` observer, a 0.22 s row-collapse reveal for each card's details,
+a 1 px lift and brightened hairline on hover, and a single 0.6 s shimmer pass on hover or
+open — never idle, never looping, all of it disabled under `prefers-reduced-motion`. The
+reticle itself always sits on the product's own sunken field surface, per the honesty rule.
+The standard sheet, its forty `.sheet-item` cards, the eight category tabs and the tier rail
+are derived from the non-gold entries and keep every number they have always shown.
+
+### 21.4 Verified, and how
+
+* Application suite **1199/1199** (29 files), including a new `tests/segmentedRing.test.tsx`
+  (14 tests): arc endpoints checked against trigonometry written independently of the
+  renderer, butt caps, legacy full-circle output unchanged, arc geometry identical in config
+  units at scales 1 / 1.25 / 1.5 / 2, outline pass per segment, schema clamping and repair
+  behaviour, and both gold configs normalising with zero repairs.
+* Website suite **84/84** (10 files) and `npm run build` green: catalogue 258 / 42 / 10,
+  budgets js 109,766 / css 8,012 / fonts 122,480 B gz, **27 contrast pairs** ≥ 4.5:1 (the 24
+  previous plus three gold-on-plate), 8 pages, and `dist/` passing every check including
+  "every Gold Series card ships its attribution in the built HTML".
+* Rendered previews: the two configs are server-side rendered through the real
+  `ReticleRenderer` to `docs/design/gold-series/*.svg` by the test suite itself, so the
+  committed SVGs can never drift from the engine.
+* A stray `}` in `components.css` (present since the stage-2 merge, harmless to browsers but
+  an esbuild warning) was removed; the minifier is now silent.
+
+### 21.5 Not verified
+
+No browser exists in this environment, so nothing here was *looked at*: the raster images
+circulated during implementation were produced by a scratch rasteriser drawing exactly the
+elements of the engine's SVG output, which is a check on geometry, not on appearance. The
+live overlay on Windows hardware, real DPI and display-scaling behaviour (100 / 125 / 150 %),
+and side-by-side comparison against the references on a real screen remain the owner's step.
+No application release was built and nothing was deployed; both wait for explicit approval.
