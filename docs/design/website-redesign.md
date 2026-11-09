@@ -1066,12 +1066,27 @@ fallback (it describes Direction A).
 
 **Surfaces — two worlds, one scale.** Each world has four steps and nothing else, so a
 component never has to invent a fifth: field `#0B0C0E` → raised `#141619` → sunken
-`#0C0D10` → plate `#1D2025`; studio `#F4F4F2` → raised `#EAEAE6` → sunken `#FFFFFF` →
-plate `#DCDCD6`. Lines are `#282C33` and `#D8D8D2`. Any surface outside this set is a bug.
+`#0C0D10` → plate `#1D2025`; studio `#F4F4F2` → raised `#EAEAE6` → sunken `#FCFCFB` →
+plate `#DCDCD6`. Lines are two steps per world: `#282C33` / `#3D434C` and `#D8D8D2` /
+`#C3C3BB`. Any surface outside this set is a bug.
 
-**Text — three steps per world, all AA-verified.** Field `#F0F1F3` / `#9BA1A9` / `#6E747C`;
-studio `#14161A` / `#4C5058` / `#7B8089`. The third step is the one that failed before
+> **Corrected during implementation.** The studio sunken step was written as `#FFFFFF`. Pure
+> white is a trap here for a mechanical reason: lightningcss shortens `#ffffff` to `#fff`, and a
+> six-digit-only hex matcher silently skips that token — so the contrast pair disappears from the
+> report instead of failing. The shipped value is `#FCFCFB`, indistinguishable on screen and
+> matched exactly. The matcher now accepts and expands three-digit shorthands.
+
+**Text — three steps per world, all AA-verified.** Field `#F0F1F3` / `#9BA1A9` / `#868C98`;
+studio `#14161A` / `#4C5058` / `#5A5F67`. The third step is the one that failed before
 (`#6B767E`, 4.16:1) and is verified in the build gate, not by eye.
+
+> **Corrected during implementation.** The values first proposed here — field `#6E747C`, studio
+> `#7B8089` — were written from the page ground and are wrong. Measured against every surface a
+> faint label actually lands on, `#7B8089` gives 4.13:1 on `--studio-1` and 3.62:1 on
+> `--studio-3`: both fail AA. The shipped values are the numeric solution to "≥4.5:1 against the
+> *darkest* surface in the world, not the page", which is `#868C98` for the field (worst 4.84:1,
+> on `--field-3`) and `#5A5F67` for the studio (worst 4.67:1, on `--studio-3`). The rule is now
+> encoded in `scripts/verify-dist.mjs`, which computes all 24 pairs from the built CSS.
 
 **Accent — one hue, two values, never a wash.** `#00E599` on field grounds, `#0A6B4C` on
 studio grounds; both clear 4.5:1 as text on their own world. On-accent text `#06231C`. The
@@ -1237,3 +1252,175 @@ typography first, then the homepage, then `/features`, `/download`, `/docs`, `/c
 `/404`, with `verify-dist.mjs` extended before each route rather than after all of them. A
 pull request will be opened for review; **nothing will be merged or deployed until the
 redesign has been reviewed and approved.**
+
+> **Superseded.** Direction C was approved and stage 2 is implemented. What actually shipped,
+> with its measured numbers and its deviations from this plan, is recorded in §20.
+
+---
+
+## 20. Implementation record (stage 2, Direction C)
+
+This section records what was built, the numbers measured from the build rather than estimated,
+every place the implementation deviates from §17–§18, and — most importantly — what was **not**
+verified. It is written to be checkable: each figure can be reproduced with the command beside
+it.
+
+### 20.1 What shipped
+
+**Seven routes plus a 404**, all prerendered to real HTML and hydrated: `/`, `/features`,
+`/pro-crosshairs`, `/academy`, `/download`, `/docs`, `/changelog`. The two new routes are the
+Pro Crosshairs vault and the Crosshair Academy — both already shipped inside the application and
+previously absent from the site entirely.
+
+**Two worlds, one seam.** `tokens.css` defines four surface steps, three text steps and two line
+steps per world, plus one accent hue with a value per world. `.world-field` and `.world-studio`
+are the only two backgrounds a band may have; a component never picks its own ground. The
+homepage uses the split exactly three times (hero, "two collections", download strip) and that
+count is asserted by a test rather than remembered.
+
+**The honesty rule, enforced by measurement.** The light studio world is editorial only. Every
+product visual — window mockups, the live playground, all 40 catalogue reticles — is drawn on a
+dark `--field-2` plate whichever world it sits in, because the six shipped reticle colours fall
+to **1.01:1** against `--studio-0`. A reticle on paper would be invisible as well as untrue.
+Every mockup carries the caption "Illustrative interface preview — not a screenshot", and a test
+requires that on every page the word "screenshot" appears *only* inside such a denial.
+
+**The catalogue is extracted, not retyped.** `scripts/extract-catalogue.mjs` bundles the
+application's own `proCrosshairs.ts`, `academy.ts` and `crosshairCollection.ts` with esbuild,
+maps each `CrosshairConfig` onto the website's renderer spec, and writes `src/catalogue.json`
+(27,003 B raw / 4,979 B gzipped). `src/catalogue.ts` is the typed boundary; no page imports
+application code. `npm run extract:check` re-extracts and fails on drift, and it is wired into
+both `npm run build` and the CI workflow — so the site cannot quietly keep describing a product
+that has moved on. Extracted facts: **258** built-in presets, **40** pro designs in 8 categories
+(35 inspired, 5 original, 0 verified — the vault deliberately attributes nothing to a named
+player), **10** tutorials with 45 steps.
+
+**Reticle renderer extended to the real schema.** Per-arm presence and geometry, square and
+circular dots, inner as well as outer outlines, whole-reticle rotation and scale. Where a static
+drawing cannot represent a shipped behaviour, the extractor records it in `beyond[]` and the page
+says so in words — one design (Bloom Trainer) uses firing bloom, and its card states that the
+drawing omits it rather than implying completeness.
+
+### 20.2 Measured numbers
+
+Reproduce with `cd website && npm run build` (the figures are printed by `verify-dist.mjs`).
+
+| Measure | Before (4ecedfc) | After | Budget |
+| --- | --- | --- | --- |
+| JavaScript, gzipped | 96,426 B | **108,699 B** | 112,000 B |
+| CSS, gzipped | 6,907 B | **7,518 B** | 10,000 B |
+| Self-hosted fonts, raw | 119,708 B | **122,480 B** | 126,000 B |
+| Contrast pairs verified | 9 | **24**, all ≥4.50:1 | — |
+| Prerendered pages | 6 | **8** (7 routes + 404) | — |
+| Website tests | 61 in 8 files | **83 in 10 files** | — |
+
+Per-route HTML, raw / gzipped: `/` 66.1 KB / 9.5 KB · `/features` 63.7 KB / 8.4 KB ·
+`/pro-crosshairs` 55.7 KB / 8.8 KB · `/academy` 22.9 KB / 5.5 KB · `/download` 17.0 KB / 5.0 KB ·
+`/docs` 18.3 KB / 6.4 KB · `/changelog` 11.9 KB / 4.1 KB · `/404` 6.2 KB / 2.0 KB.
+
+The JavaScript increase is accounted for rather than absorbed: `catalogue.json` is 4,979 B
+gzipped of it, and the rest is two new routes plus a renderer that now covers per-arm geometry,
+square dots, inner outlines, rotation and scale. Budgets were re-set from the measured result and
+the reasoning is written into `verify-dist.mjs` beside the numbers, so the next increase has to
+justify itself instead of hiding.
+
+CSS grew by about 600 B while gaining a second palette, a contact sheet, a curriculum, rails and
+split panels. It grew that little because **33 dead rules from the previous design were removed**
+(the old feature explorer and its tabs, the step grid, the plate components, `.lead`, `.dim`,
+`.sr-only`). The removal was verified by comparing the selector sets before and after, so nothing
+live was lost with them.
+
+Fonts: Space Grotesk dropped (−26,152 B), Archivo 700 and 800 added (+28,924 B), Inter 400/500/600
+and JetBrains Mono 400 kept. **Archivo 600 was deliberately excluded** — it costs 13,820 B and
+would have broken the previous ceiling, so sub-headings use Inter 600. Seven woff2 files, latin
+subsets, `font-display: swap`. The concept pages' Google Fonts `<link>`s never entered
+`website/`; a test fails the build on any origin that is not the repository or the site itself.
+
+### 20.3 Deviations from the plan, and why
+
+1. **`/features` is six sections, not a tabbed explorer.** §18 sketched tabs. A tablist hides five
+   of the six areas from a crawler and from a reader without script, and repeating one layout six
+   times was precisely §7's finding about the old site. Each area now has its own composition — a
+   ruled parameter list, a contact sheet of eight real presets, a flipped split, three columns,
+   keycaps, and a flush dark stage with the one looped demonstration on the page (firing bloom,
+   which shows a behaviour rather than decorating a section). A jump index at the top links the
+   six anchors.
+2. **Buttons state their fact beside the label, not inside it.** §17 proposed `Download · 84.7 MB`.
+   The owner specified the pair "Download crshhx" / "Download portable" in an earlier round, so
+   those labels are kept and the measured size, version and SHA-256 sit in the fact row directly
+   above each button, where two builds can be compared.
+3. **`/docs` is a light studio page.** §19 listed this as an open question. It is answered in
+   favour of the studio world: documentation is editorial surface, and its product visuals are
+   plates, so the honesty rule is not bent. Its tables sit in focusable, labelled scroll regions
+   rather than being crushed or hidden.
+4. **A shared `SectionHead` component was deleted.** It was one reason every section looked the
+   same. Each page now writes its own head; only `Callout` survives as a shared block.
+5. **The header carries five text links, not seven.** Home is the brand and Download is the call
+   to action; repeating either as a text link is noise. The mobile menu lists all seven.
+
+### 20.4 What was verified, and how
+
+* **Tests** — `npm test`: 83 passed, 10 files. Includes hydration without markup change on every
+  route, one `<h1>` per page, banned-phrase and fabricated-statistic sweeps over all pages, the
+  "screenshot only as a denial" rule, mockup captions, the real release facts (URLs, byte sizes,
+  SHA-256s), the no-JS pending state, the catalogue's internal consistency, and a test that reads
+  the desktop application's `Sidebar.tsx` and requires every navigation label the website shows to
+  exist in the product.
+* **Types** — `npm run typecheck`: both projects clean.
+* **Build and distribution** — `npm run build`: extract check, client build, server build,
+  prerender, then `verify-dist.mjs`, which recomputes all 24 contrast pairs *from the built CSS*,
+  checks budgets, requires every `.exe` href to exist in the release manifest and every manifest
+  fact to appear on `/download`, and fails on any third-party origin.
+* **Release facts, against production** — the download page's filenames, byte sizes, URLs and
+  SHA-256 values were compared with GitHub's own record of the published release, not just with
+  `src/releases.json`:
+  `gh api repos/sfingW/crshhX/releases/tags/v1.1.0 --jq '.assets[] | {name, size, digest}'`
+  returns `sha256:bed1e654…dccac45d` / 88,862,700 B for the installer and
+  `sha256:037476de…8ba842e2` / 81,455,085 B for the portable build — both identical to what the
+  page prints. A request for the installer URL returns `302` to the asset host with
+  `filename=crshhx-crosshair-studio-setup-1.1.0.exe`, so the link is live and points at a real
+  file. (The asset host itself is not reachable from the development environment, so the bytes
+  could not be re-downloaded and re-hashed locally; the digest comparison is GitHub's.)
+* **Links** — every `href` in the built HTML was resolved: 111 unique links across 8 pages.
+  Internal paths resolve to files that exist, in-page anchors resolve to ids on the same page,
+  cross-page anchors (`/docs#faq`, `/docs#troubleshooting`) resolve to ids in the target file, and
+  both executable links match the manifest exactly.
+* **Structure and accessibility, statically** — a scripted audit of the built HTML: one `<h1>` per
+  page, no skipped heading level, no duplicate `id`, no button or link without an accessible name,
+  no positive `tabindex`, `<main id="main">` and a skip link on every page, every `<nav>` labelled,
+  every table with header cells, every `<details>` with a `<summary>`. Eight pages, zero findings.
+  Focus is a single global `:focus-visible` ring in the accent of the current world (11.80:1 on the
+  field, 5.92:1 in the studio), all motion is disabled under `prefers-reduced-motion`, the category
+  filter uses `aria-pressed` with a `role="status"` count, and the mobile menu reports
+  `aria-expanded` and `aria-controls`.
+* **Responsive, by construction** — every composition is an `auto-fit`/`auto-fill` grid or a
+  wrapping flex row except two, which have explicit breakpoints: the ruled list collapses to one
+  column below 640px, and the three-column requirements table scrolls in a focusable region. The
+  split hero stacks below 980px with the reticle re-anchored to the field half, as §17 required.
+  Navigation switches to a menu below 1024px.
+
+### 20.5 What was **not** verified — stated plainly
+
+**No browser was used, and nothing was looked at.** Browser automation is unavailable in this
+environment (no browser binaries; the Playwright download host is unreachable), so there are no
+screenshots, and no claim in this document or in the pull request is based on seeing the rendered
+site. Specifically **not** verified:
+
+* visual appearance, alignment, spacing rhythm, type scale and colour as actually rendered;
+* real-browser responsive behaviour at 360 / 768 / 1024 / 1440 px, and the absence of horizontal
+  overflow — asserted from CSS structure, not measured in a viewport;
+* keyboard traversal and screen-reader behaviour in a real assistive technology;
+* Lighthouse, Core Web Vitals, field or lab performance, and paint behaviour with the fonts;
+* the Cloudflare Pages build and deployment, whose configuration is dashboard-only;
+* the Windows application itself on physical hardware.
+
+The CSS in this redesign is therefore reasoned about numerically (every colour measured, every
+layout described in intrinsic grid terms) and checked structurally, but its appearance has not
+been seen by me. **Reviewing the rendered pages in a browser is the owner's step, and it is the
+one gap this record cannot close.**
+
+### 20.6 Git
+
+All work is on `arena/349e1219-crshhx`, branched from `4ecedfc`. Nothing was pushed to `main`,
+no release was created, and nothing was deployed. A pull request is opened for review; merging,
+releasing and deploying wait for the owner's approval.
