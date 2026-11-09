@@ -37,7 +37,7 @@ export const SITE = {
   url: ORIGIN_FROM_ENV || DEFAULT_ORIGIN,
   repository: 'https://github.com/sfingW/crshhX',
   /** Content date for the sitemap. Bumped by hand when pages change. */
-  updated: '2026-11-08',
+  updated: '2026-11-09',
 } as const;
 
 export interface RouteMeta {
@@ -64,6 +64,20 @@ export const ROUTES: readonly RouteMeta[] = [
       'What crshhx actually does: a per-arm crosshair editor with undo and A/B compare, preset folders and favourites, versioned import and export, game profiles, weapon-slot switching and overlay controls.',
   },
   {
+    path: '/pro-crosshairs',
+    label: 'Pro Crosshairs',
+    title: 'Pro Crosshairs — 40 curated designs in crshhx',
+    description:
+      'The 40 curated crosshair designs built into crshhx, across 8 categories, with an interactive preview bench. No design is attributed to a named player unless that player published it themselves.',
+  },
+  {
+    path: '/academy',
+    label: 'Academy',
+    title: 'Crosshair Academy — the tutorials inside crshhx',
+    description:
+      'The 10 tutorials built into crshhx, from first launch to weapon-slot switching, each with live editable demos and clearly labelled illustrations. Read the curriculum before you install.',
+  },
+  {
     path: '/download',
     label: 'Download',
     title: 'Download — crshhx for Windows',
@@ -82,12 +96,20 @@ export const ROUTES: readonly RouteMeta[] = [
     label: 'Changelog',
     title: 'Changelog — crshhx release history',
     description:
-      'Release history for crshhx. Nothing has been published yet; development notes from the repository are listed separately and clearly labelled as unpublished.',
+      'Release history for crshhx, rendered from the repository’s release manifest: v1.1.0 published for Windows with measured file sizes and SHA-256 checksums, and earlier development notes listed separately and labelled as unpublished.',
   },
 ];
 
 /** Header and footer navigation, in display order. */
 export const NAV_LINKS: readonly RouteMeta[] = ROUTES;
+
+/**
+ * The routes shown as text links in the header. Home is the brand, and Download
+ * is the call to action at the end of the bar, so neither is repeated as a link.
+ */
+export const HEADER_LINKS: readonly RouteMeta[] = ROUTES.filter(
+  (route) => route.path !== '/' && route.path !== '/download',
+);
 
 export const NOT_FOUND_PATH = '/404';
 

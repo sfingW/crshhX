@@ -2,12 +2,14 @@ import { useEffect } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { Footer } from './components/Footer';
 import { Nav } from './components/Nav';
+import { AcademyPage } from './pages/AcademyPage';
 import { ChangelogPage } from './pages/ChangelogPage';
 import { DocsPage } from './pages/DocsPage';
 import { DownloadPage } from './pages/DownloadPage';
 import { FeaturesPage } from './pages/FeaturesPage';
 import { HomePage } from './pages/HomePage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { ProCrosshairsPage } from './pages/ProCrosshairsPage';
 import { routeFor } from './site';
 
 const NOT_FOUND_TITLE = 'Page not found — crshhx';
@@ -55,6 +57,8 @@ export function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/features" element={<FeaturesPage />} />
+          <Route path="/pro-crosshairs" element={<ProCrosshairsPage />} />
+          <Route path="/academy" element={<AcademyPage />} />
           <Route path="/download" element={<DownloadPage />} />
           <Route path="/docs" element={<DocsPage />} />
           <Route path="/changelog" element={<ChangelogPage />} />

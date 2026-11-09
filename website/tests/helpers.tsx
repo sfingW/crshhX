@@ -16,6 +16,14 @@ export function hrefsIn(html: string): string[] {
 }
 
 /** Every route the site publishes, plus the not-found path the prerender emits. */
-export const ALL_PATHS = ['/', '/features', '/download', '/docs', '/changelog'] as const;
+export const ALL_PATHS = [
+  '/',
+  '/features',
+  '/pro-crosshairs',
+  '/academy',
+  '/download',
+  '/docs',
+  '/changelog',
+] as const;
 
 export const KNOWN_PATHS = [...ALL_PATHS, '/404'] as const;

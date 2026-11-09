@@ -121,20 +121,36 @@ describe('link integrity', () => {
       }
       expect(html, path).toContain('nav-cta');
       expect(html, path).toContain('Download');
-      expect(html.match(/class="nav-link[ "]/g)?.length, path).toBe(4);
+      // Five text links: Features, Pro Crosshairs, Academy, Documentation and
+      // Changelog. Home is the brand, Download is the call to action.
+      expect(html.match(/class="nav-link[ "]/g)?.length, path).toBe(5);
     }
   });
 
   it('marks the current page in the navigation', () => {
-    // Download is the header call to action rather than a text link, so the four
+    // Download is the header call to action rather than a text link, so the five
     // text links cover the remaining routes.
-    for (const path of ['/', '/features', '/docs', '/changelog'] as const) {
+    for (const path of [
+      '/features',
+      '/pro-crosshairs',
+      '/academy',
+      '/docs',
+      '/changelog',
+    ] as const) {
       expect(HTML[path].match(/class="nav-link active"/g)?.length, path).toBe(1);
+      expect(HTML[path].match(/aria-current="page"/g)?.length, path).toBe(1);
       const cta = /<a[^>]*nav-cta[^>]*>/.exec(HTML[path])?.[0] ?? '';
       expect(cta, path).toContain('href="/download"');
       expect(cta, path).not.toContain('aria-current');
     }
+    // Home is not a header text link: the brand is, so that is what carries
+    // aria-current there. Before this the home page had no current-page marker
+    // at all, which is a keyboard and screen-reader regression, not a style.
+    expect(HTML['/']).toMatch(/<a[^>]*class="brand"[^>]*aria-current="page"/);
+    expect(HTML['/'].match(/class="nav-link active"/g)).toBeNull();
     expect(HTML['/features']).toContain('>Features</a>');
+    expect(HTML['/pro-crosshairs']).toContain('>Pro Crosshairs</a>');
+    expect(HTML['/academy']).toContain('>Academy</a>');
     expect(HTML['/docs']).toContain('>Documentation</a>');
     expect(HTML['/download']).toContain('aria-current="page"');
     expect(HTML['/download'].match(/class="nav-link active"/g)).toBeNull();
@@ -148,6 +164,32 @@ describe('link integrity', () => {
     expect(html).toContain('href="/changelog"');
     expect(html).toContain('href="/docs#troubleshooting"');
     expect(html).toContain('Release notes');
+  });
+
+  it('links the catalogue pages to each other and to the download', () => {
+    // Neither new page is an island: each explains something a visitor may want
+    // to act on, and both reach the download and the documentation.
+    for (const path of ['/pro-crosshairs', '/academy'] as const) {
+      const html = HTML[path];
+      expect(html, path).toContain('href="/download"');
+      expect(html, path).toContain('Download for Windows');
+    }
+    expect(HTML['/pro-crosshairs']).toContain('href="/academy"');
+    expect(HTML['/features']).toContain('href="/pro-crosshairs"');
+    expect(HTML['/']).toContain('href="/pro-crosshairs"');
+    expect(HTML['/']).toContain('href="/academy"');
+    // The features jump index resolves to the six areas on the same page.
+    const anchors = hrefsIn(HTML['/features']).filter(
+      (href) => href.startsWith('#') && href !== '#main',
+    );
+    expect(anchors).toEqual([
+      '#editor',
+      '#presets',
+      '#transfer',
+      '#profiles',
+      '#slots',
+      '#overlay',
+    ]);
   });
 
   it('offers a way back from the 404 page', () => {

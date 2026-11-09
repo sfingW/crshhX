@@ -71,13 +71,23 @@ describe('hydration', () => {
     expect(headline?.textContent).toContain('Your crosshair');
     expect(container.querySelectorAll('h1')).toHaveLength(1);
 
-    expect(headline?.textContent).toBe('Your crosshair, exactly where you put it.');
+    // The Field & Studio headline. The third line is the claim that matters —
+    // an overlay, not an injection — and it is pinned because it is the sentence
+    // the whole page is built around.
+    // The three lines are separated by <br /> elements, which is where an
+    // assistive technology pauses; jsdom concatenates the text nodes with no
+    // space, so assert the lines rather than the joined string.
+    expect(headline?.textContent).toContain('Your crosshair,');
+    expect(headline?.textContent).toContain('drawn over the game.');
+    expect(headline?.querySelector('.dim-line')?.textContent).toBe('Never inside it.');
 
     // React must reuse the server markup rather than throw it away, so the
-    // hydrated tree has the same elements the prerender produced.
-    const prerenderedRows = (prerendered.match(/class="spec-row"/g) ?? []).length;
-    expect(container.querySelectorAll('.spec-row').length).toBe(prerenderedRows);
-    expect(prerenderedRows).toBe(6);
+    // hydrated tree has the same elements the prerender produced. The rail is
+    // the four counted facts under the hero; the numbers come from the generated
+    // catalogue, so they cannot disagree with the application.
+    const prerenderedRows = (prerendered.match(/class="rail-item"/g) ?? []).length;
+    expect(container.querySelectorAll('.rail-item').length).toBe(prerenderedRows);
+    expect(prerenderedRows).toBe(4);
     const prerenderedSvgs = (prerendered.match(/<svg/g) ?? []).length;
     expect(container.querySelectorAll('svg').length).toBe(prerenderedSvgs);
 
@@ -88,7 +98,14 @@ describe('hydration', () => {
   });
 
   it('hydrates every other route cleanly', async () => {
-    for (const path of ['/features', '/download', '/docs', '/changelog'] as const) {
+    for (const path of [
+      '/features',
+      '/pro-crosshairs',
+      '/academy',
+      '/download',
+      '/docs',
+      '/changelog',
+    ] as const) {
       problems.length = 0;
       const { container } = await hydrate(path);
       expect(problems, path).toEqual([]);
@@ -119,7 +136,7 @@ describe('hydration', () => {
     expect(problems).toEqual([]);
     expect(window.location.pathname).toBe('/features');
     expect(container.querySelector('h1')?.textContent).toBe(
-      'What the application actually does',
+      'What the application actually does.',
     );
     expect(container.querySelectorAll('h1')).toHaveLength(1);
     expect(document.title).toBe(routeFor('/features')?.title);
@@ -141,7 +158,7 @@ describe('hydration', () => {
     });
     expect(container.querySelector('.nav-menu')).not.toBeNull();
     expect(burger?.getAttribute('aria-expanded')).toBe('true');
-    expect(container.querySelectorAll('.nav-menu-link').length).toBe(5);
+    expect(container.querySelectorAll('.nav-menu-link').length).toBe(7);
 
     const docsLink = container.querySelector<HTMLAnchorElement>('.nav-menu a[href="/docs"]');
     await act(async () => {
@@ -151,7 +168,7 @@ describe('hydration', () => {
     expect(problems).toEqual([]);
     expect(window.location.pathname).toBe('/docs');
     expect(container.querySelector('.nav-menu')).toBeNull();
-    expect(container.querySelector('h1')?.textContent).toBe('How crshhx works');
+    expect(container.querySelector('h1')?.textContent).toBe('How crshhx works.');
   });
 
   it('turns the download call to action into direct executable links once shipped', async () => {
