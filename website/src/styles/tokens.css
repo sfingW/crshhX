@@ -1,41 +1,80 @@
 /* ------------------------------------------------------------------ *
  * crshhx website — design tokens
  *
- * The palette is derived from the application's own mark: an ink field,
- * a pale mint ring and an emerald reticle. The site uses the *ring* as its
- * interactive accent and reserves saturated reticle colours for product
- * visuals, where they are information rather than decoration.
+ * Field & Studio.
+ *
+ * The application exists between two environments, and the site is laid out as
+ * that boundary:
+ *
+ *   FIELD   the game. Dark, full-screen, the surface the overlay draws on.
+ *   STUDIO  the editor. Light, precise, where the reticle is controlled.
+ *
+ * Two rules keep this an identity rather than a gimmick.
+ *
+ * 1. A world is a surface decision, never a product claim. The application
+ *    itself is dark, so every product visual — the window mockups, the live
+ *    playground stage, every reticle — is drawn on a dark plate whichever world
+ *    it sits in. The light world is the site's own editorial surface. Measured,
+ *    not stylistic: the six shipped reticle colours fall to 1.01:1 against
+ *    --studio-0, so a reticle on paper would be invisible as well as untrue.
+ *
+ * 2. Every colour below is a measured value. The contrast pairs are asserted on
+ *    the built CSS by scripts/verify-dist.mjs, and the ratios are recorded in
+ *    docs/design/website-redesign.md section 17.
  * ------------------------------------------------------------------ */
 
 :root {
   color-scheme: dark;
 
-  /* Surfaces */
-  --ink-0: #0b0e12; /* page */
-  --ink-1: #0f1319; /* raised */
-  --ink-2: #141a21; /* cards, panels */
-  --ink-3: #1a212a; /* hover panels, code */
+  /* ------------------------------------------------------------ the field */
+  --field-0: #0b0c0e; /* page */
+  --field-1: #141619; /* raised band, panels */
+  --field-2: #0c0d10; /* sunken: the surface a reticle is drawn on */
+  --field-3: #1d2025; /* plate: an application surface inside a band */
+  --field-line: #282c33;
+  --field-line-2: #3d434c;
+  /* 17.31 / 16.04 / 14.45 against field-0 / -1 / -3 */
+  --on-field: #f0f1f3;
+  /* 7.51 / 6.96 / 6.27 */
+  --on-field-2: #9ba1a9;
+  /* 5.79 / 5.37 / 4.84 — the faintest text allowed on a dark world */
+  --on-field-3: #868c98;
 
-  /* Lines */
-  --line: rgba(226, 236, 238, 0.09);
-  --line-strong: rgba(226, 236, 238, 0.16);
+  /* ----------------------------------------------------------- the studio */
+  --studio-0: #f4f4f2; /* page */
+  --studio-1: #eaeae6; /* raised band, panels */
+  --studio-2: #fcfcfb; /* sunken: an inset, a table row on hover */
+  --studio-3: #dcdcd6; /* plate edge, a filled control track */
+  --studio-line: #d8d8d2;
+  --studio-line-2: #c3c3bb;
+  /* 16.45 / 15.02 / 18.02 */
+  --on-studio: #14161a;
+  /* 7.35 / 6.71 / 8.05 */
+  --on-studio-2: #4c5058;
+  /* 5.84 / 5.33 / 6.43 / 4.67 — measured against all four studio surfaces,
+     because a faint label lands on whichever panel it is written on */
+  --on-studio-3: #5a5f67;
 
-  /* Text */
-  --text: #e8edef;
-  --text-dim: #98a4ab;
-  /* Measured, not estimated: 4.16:1 on --ink-0 failed WCAG AA for normal-size
-     text while being used at 11px (.pg-head). 5.21:1 on --ink-0, and it still
-     clears 4.5:1 on every surface in the app's own ramp (#111215 / #1b1c22 /
-     #22232b) that the redesign adopts. See docs/design/website-redesign.md. */
-  --text-faint: #868c98;
+  /* ------------------------------------------------------------ the accent *
+   * One hue, two values, chosen for the ground each is read on. Used on a
+   * call to action, an active control and one or two data points per screen —
+   * never as a band, a gradient or a glow. */
+  --accent: #00e599; /* on the field: 11.80 / 10.93 / 9.85 */
+  --accent-bright: #4cf0bc; /* hover */
+  --accent-deep: #0a6b4c; /* in the studio: 5.92 / 5.41 / 6.49 */
+  --on-accent: #06231c; /* 10.01 against --accent */
+  --accent-tint: rgba(0, 229, 153, 0.12);
+  --accent-tint-line: rgba(0, 229, 153, 0.3);
 
-  /* Brand — the pale mint of the mark's ring */
-  --brand: #6fd9c0;
-  --brand-bright: #93e8d3;
-  --brand-deep: #0f3f36;
-  --on-brand: #05231c;
+  /* ----------------------------------------------------------- semantic */
+  --ok: #4fbf8b;
+  --warn: #d9a441;
+  --danger: #d9695a;
 
-  /* Product colours, used only for reticles and product visuals */
+  /* ------------------------------------------------- product reticle colours
+   * Information, not decoration. These are the colours the application ships
+   * and the colours the built-in catalogue actually uses; they appear only
+   * inside a drawn reticle, on a dark field. */
   --reticle-cyan: #35e0ff;
   --reticle-green: #2be08a;
   --reticle-white: #f2f5f6;
@@ -43,16 +82,36 @@
   --reticle-amber: #ffc24d;
   --reticle-red: #ff5c5c;
 
-  /* Semantic */
-  --warn: #e0a458;
-  --danger: #e0705f;
-
-  /* Type */
-  --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, sans-serif;
+  /* -------------------------------------------------------------- typefaces
+   * Archivo carries display weight: bold, tight, graphic. Inter carries
+   * everything read. Sub-headings stay on Inter 600 rather than adding an
+   * Archivo 600 file, which would take the font payload past its budget. */
+  --font-display: 'Archivo', 'Inter', system-ui, -apple-system, sans-serif;
   --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
 
-  /* Spacing scale */
+  /* ----------------------------------------------------------- type scale
+   * The scale the previous design lacked: no two levels share a weight, and the
+   * hero is 5.2x body text rather than 3.7x. */
+  --display-1: clamp(2.75rem, 5.6vw, 5.375rem); /* 44 -> 86px */
+  --display-1-lh: 0.92;
+  --display-1-ls: -0.05em;
+  --display-2: clamp(2rem, 4.4vw, 4rem); /* 32 -> 64px */
+  --display-2-lh: 0.98;
+  --display-2-ls: -0.045em;
+  /* The studio half of a split speaks at its own volume: same face, smaller. */
+  --display-3: clamp(1.875rem, 3.1vw, 2.875rem); /* 30 -> 46px */
+  --display-3-lh: 1.04;
+  --display-3-ls: -0.035em;
+  --title-1: 1.375rem; /* 22px */
+  --title-2: 1.0625rem; /* 17px */
+  --lead: 1.125rem;
+  --body: 1.0625rem;
+  --small: 0.875rem;
+  --data: 0.75rem;
+  --eyebrow: 0.6875rem;
+
+  /* ------------------------------------------------------------- spacing */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -62,28 +121,69 @@
   --space-7: 48px;
   --space-8: 64px;
   --space-9: 96px;
+  --space-10: 128px;
+  --space-11: 160px;
+  --space-12: 208px;
+  --section-y: clamp(64px, 8vw, 120px);
+  --gutter: clamp(20px, 5vw, 56px);
 
-  /* Shape */
-  --radius-s: 6px;
-  --radius-m: 10px;
-  --radius-l: 14px;
+  /* --------------------------------------------------------------- shape */
+  --radius-s: 4px; /* controls, pills, inputs, code */
+  --radius-l: 8px; /* panels, product frames */
 
-  /* Motion */
+  /* -------------------------------------------------------------- motion */
   --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
   --duration: 420ms;
+  --duration-fast: 160ms;
 
-  /* Layout */
-  --container: 1120px;
-  --nav-h: 64px;
+  /* -------------------------------------------------------------- layout */
+  --container: 1320px;
+  --container-narrow: 1120px;
+  --nav-h: 66px;
 }
 
-/* Removed with the redesign: the "HUD instrumentation layer".
+/* ------------------------------------------------------------------ *
+ * Worlds
+ *
+ * A world redefines the same handful of local names, so a component is written
+ * once and reads correctly on either ground. `.world-studio` is the only
+ * override; the field is the default because the page itself is dark.
+ * ------------------------------------------------------------------ */
 
-   --grid-line painted a 28px mint hairline grid behind the editor stage, and
-   --accent-2 / --grad-accent defined a brand-to-cyan gradient. The gradient
-   tokens were declared and never used anywhere in src/, and the grid is
-   decoration of exactly the kind the redesign brief rules out ("unnecessary
-   scan lines and HUD decorations"). The centre axis guides on the stage are
-   kept: those are functional, since aligning a crosshair needs a centre
-   reference. See docs/design/website-redesign.md section 5, defect 3. */
+:root,
+.world-field {
+  --bg: var(--field-0);
+  --bg-raised: var(--field-1);
+  --bg-sunken: var(--field-2);
+  --bg-plate: var(--field-3);
+  --line: var(--field-line);
+  --line-strong: var(--field-line-2);
+  --fg: var(--on-field);
+  --fg-2: var(--on-field-2);
+  --fg-3: var(--on-field-3);
+  --accent-here: var(--accent);
+  --tint-here: var(--accent-tint);
+  --tint-line-here: var(--accent-tint-line);
+}
 
+.world-studio {
+  --bg: var(--studio-0);
+  --bg-raised: var(--studio-1);
+  --bg-sunken: var(--studio-2);
+  --bg-plate: var(--studio-3);
+  --line: var(--studio-line);
+  --line-strong: var(--studio-line-2);
+  --fg: var(--on-studio);
+  --fg-2: var(--on-studio-2);
+  --fg-3: var(--on-studio-3);
+  --accent-here: var(--accent-deep);
+  /* A tint of the deep green, so a selected control reads the same way in both
+     worlds without the neon value being laid on paper. */
+  --tint-here: rgba(10, 107, 76, 0.1);
+  --tint-line-here: rgba(10, 107, 76, 0.28);
+}
+
+/* Removed with the first redesign and not reintroduced: --grid-line, the HUD
+   instrumentation layer, --accent-2 and --grad-accent. A band is separated by
+   a change of world or by space, never by a rule applied by default, and no
+   gradient, scanline or glow appears anywhere in this system. */

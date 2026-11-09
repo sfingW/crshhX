@@ -1,29 +1,14 @@
 import type { ReactNode } from 'react';
 import { IconAlert } from './icons';
 
-export function SectionHead({
-  eyebrow,
-  title,
-  lead,
-  centered = false,
-  level = 2,
-}: {
-  eyebrow: string;
-  title: string;
-  lead?: string;
-  centered?: boolean;
-  /** Interior pages open with their only `h1`; sections inside a page stay `h2`. */
-  level?: 1 | 2;
-}) {
-  const Heading = level === 1 ? 'h1' : 'h2';
-  return (
-    <div className={`section-head${centered ? ' centered' : ''}`}>
-      <span className="eyebrow">{eyebrow}</span>
-      <Heading className="section-title">{title}</Heading>
-      {lead ? <p className="section-lead">{lead}</p> : null}
-    </div>
-  );
-}
+/**
+ * Shared blocks.
+ *
+ * `SectionHead` was removed in the Field & Studio redesign: every page now sets
+ * its own head, because a shared head component was one of the reasons every
+ * section looked the same. What is genuinely shared is the callout — a note that
+ * has to be read, ruled on the left rather than boxed.
+ */
 
 export function Callout({
   title,
