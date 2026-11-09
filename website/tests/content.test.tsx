@@ -1,3 +1,4 @@
+import { SITE } from '../src/site';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -225,8 +226,17 @@ describe('server-rendered content', () => {
     for (const file of files) {
       const text = readFileSync(file, 'utf8');
       expect(text.match(tracking), file).toBeNull();
+      // Two first-party origins, and nothing else. The repository supplies
+      // release assets and issue links; SITE.url is the site's own origin, which
+      // canonical / og:url / sitemap.xml need. Neither is a request to a third
+      // party — nothing is fetched from either at runtime. Deriving the second
+      // from SITE.url means this allowlist cannot drift from the configured
+      // origin, and any other host still fails the test.
       for (const origin of text.match(/https?:\/\/[^"'`\s)]+/g) ?? []) {
-        expect(origin, `${file}: ${origin}`).toMatch(/^https:\/\/github\.com\/sfingW\/crshhX/);
+        const firstParty =
+          origin.startsWith('https://github.com/sfingW/crshhX') ||
+          origin.startsWith(SITE.url);
+        expect(firstParty, `${file}: ${origin}`).toBe(true);
       }
     }
   });

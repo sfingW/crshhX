@@ -23,7 +23,11 @@
   /* Text */
   --text: #e8edef;
   --text-dim: #98a4ab;
-  --text-faint: #6b767e;
+  /* Measured, not estimated: 4.16:1 on --ink-0 failed WCAG AA for normal-size
+     text while being used at 11px (.pg-head). 5.21:1 on --ink-0, and it still
+     clears 4.5:1 on every surface in the app's own ramp (#111215 / #1b1c22 /
+     #22232b) that the redesign adopts. See docs/design/website-redesign.md. */
+  --text-faint: #868c98;
 
   /* Brand — the pale mint of the mark's ring */
   --brand: #6fd9c0;
@@ -73,9 +77,13 @@
   --nav-h: 64px;
 }
 
-/* HUD instrumentation layer: hairline grid + the one allowed gradient. */
-:root {
-  --grid-line: rgba(111, 217, 192, 0.05);
-  --accent-2: #35e0ff;
-  --grad-accent: linear-gradient(90deg, var(--brand), var(--accent-2));
-}
+/* Removed with the redesign: the "HUD instrumentation layer".
+
+   --grid-line painted a 28px mint hairline grid behind the editor stage, and
+   --accent-2 / --grad-accent defined a brand-to-cyan gradient. The gradient
+   tokens were declared and never used anywhere in src/, and the grid is
+   decoration of exactly the kind the redesign brief rules out ("unnecessary
+   scan lines and HUD decorations"). The centre axis guides on the stage are
+   kept: those are functional, since aligning a crosshair needs a centre
+   reference. See docs/design/website-redesign.md section 5, defect 3. */
+

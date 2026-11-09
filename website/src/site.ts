@@ -5,15 +5,36 @@
  * a route's title, description and navigation entry can never drift apart.
  */
 
+/**
+ * Public origin.
+ *
+ * `SITE_URL` in the deploy environment still wins, so a purchased domain or a
+ * path-prefixed host needs no code change. It falls back to the origin that is
+ * actually serving this site in production, which was verified by fetching it
+ * rather than assumed: https://crshhx.pages.dev
+ *
+ * This used to fall back to an empty string, on the reasoning that a wrong
+ * canonical is worse than none. That reasoning was right while no origin
+ * existed, but the site has been live at this origin since v1.1.0, and the
+ * empty fallback was silently dropping `canonical`, `og:url` and `sitemap.xml`
+ * from every page in production. The build said so — `origin=(unset —
+ * canonical and og:url omitted)` — and nothing caught it, because no CI job
+ * ran the website build. Defaulting it here fixes the metadata without needing
+ * access to the host's dashboard.
+ *
+ * If a real domain is purchased, set `SITE_URL` and this default is overridden.
+ * If the Pages project is ever renamed, this string has to change with it.
+ */
+const DEFAULT_ORIGIN = 'https://crshhx.pages.dev';
+const ORIGIN_FROM_ENV = ((import.meta.env.SITE_URL as string | undefined) ?? '').replace(
+  /\/+$/,
+  '',
+);
+
 export const SITE = {
   name: 'crshhx',
   productName: 'Crshhx Crosshair Studio',
-  /**
-   * Set `SITE_URL` in the deploy environment. Until a domain exists this stays
-   * empty and the prerender omits `canonical` / `og:url` rather than pointing
-   * them at a placeholder — a wrong canonical is worse than none.
-   */
-  url: (import.meta.env.SITE_URL as string | undefined) ?? '',
+  url: ORIGIN_FROM_ENV || DEFAULT_ORIGIN,
   repository: 'https://github.com/sfingW/crshhX',
   /** Content date for the sitemap. Bumped by hand when pages change. */
   updated: '2026-11-08',
@@ -47,7 +68,7 @@ export const ROUTES: readonly RouteMeta[] = [
     label: 'Download',
     title: 'Download — crshhx for Windows',
     description:
-      'Download crshhx for Windows 10 and 11 (64-bit). The page lists the current release — an installer and a portable executable — with measured sizes, SHA-256 checksums, installation steps and system requirements, straight from the release manifest.',
+      'Download crshhx for Windows 10 and 11 (64-bit). The current release as an installer and a portable executable, with measured sizes, SHA-256 checksums, installation steps and system requirements — straight from the release manifest.',
   },
   {
     path: '/docs',

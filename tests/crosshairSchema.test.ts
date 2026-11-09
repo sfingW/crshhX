@@ -141,6 +141,25 @@ describe('schema: backward compatibility with v1 configs', () => {
     }
   });
 
+  /**
+   * The website publishes this exact figure ("258 built-in presets"), and it is
+   * the kind of claim that goes stale silently: nothing else in the repository
+   * depends on the vault's length, so adding a family of presets would not fail
+   * a single test while the marketing pages kept quoting the old number.
+   *
+   * Confirmed by execution rather than by reading, because the vault is built
+   * combinatorially inside generateCrosshairVault() and cannot be counted by
+   * eye. If this fails the count really has changed, so update the website copy
+   * in the same commit. See docs/design/website-redesign.md section 5.
+   */
+  it('keeps the built-in vault at the count the website publishes', () => {
+    expect(COMPLETE_CROSSHAIR_VAULT.length).toBe(258);
+    expect(COMPLETE_CROSSHAIR_VAULT.every((preset) => preset.isBuiltIn)).toBe(true);
+    expect(new Set(COMPLETE_CROSSHAIR_VAULT.map((preset) => preset.id)).size).toBe(
+      COMPLETE_CROSSHAIR_VAULT.length,
+    );
+  });
+
   it('leaves DEFAULT_CONFIG unchanged apart from the version stamp', () => {
     const { config, repairs } = normalizeCrosshairConfig(DEFAULT_CONFIG);
     expect(repairs).toEqual([]);

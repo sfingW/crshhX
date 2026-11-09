@@ -718,7 +718,11 @@ notes.**
 (product / resources / repository / legal) with the wordmark, a "no analytics, no telemetry"
 line and the repository link.
 
-**404** — fix the missing `<title>`, carry the reticle motif, provide real onward links.
+**404** — carries the reticle motif and provides real onward links. Verified as already
+  correct: `dist/404.html` has exactly one `<title>` ("Page not found — crshhx") and one
+  `<h1>`, and `prerender.mjs` sets `robots: noindex` for it. An earlier draft of this
+  document claimed the 404 title was missing; that was a bad check against
+  `dist/404/index.html` rather than `dist/404.html`, and the claim is withdrawn.
 
 ---
 

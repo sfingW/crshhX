@@ -1,0 +1,17 @@
+{
+  "//": "Build-side TypeScript: vite.config.ts runs in Node, not the browser, so it needs Node's globals. Mirrors the repository root's tsconfig.node.json convention, which keeps process/env out of the renderer's type environment. Checked by `npm run typecheck`.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["vite.config.ts"]
+}

@@ -767,10 +767,11 @@
   min-height: 250px;
   border: 1px solid var(--line);
   border-radius: var(--radius-m);
-  background:
-    linear-gradient(to right, var(--grid-line) 1px, transparent 1px) 50% 50% / 28px 28px,
-    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px) 50% 50% / 28px 28px,
-    var(--ink-0);
+  /* The 28px mint hairline grid that used to sit under these two lines was
+     HUD decoration and is gone; --ink-0 alone is the field. The centre axis
+     guides below stay — they are the alignment reference a crosshair editor
+     genuinely needs, not ornament. */
+  background: var(--ink-0);
   display: grid;
   place-items: center;
   overflow: hidden;
