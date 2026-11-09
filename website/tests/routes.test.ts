@@ -1,10 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { MOCK_DISCLOSURE, NAV_LINKS, NOT_FOUND_PATH, ROUTES, SITE, routeFor } from '../src/site';
+import {
+  HEADER_LINKS,
+  MOCK_DISCLOSURE,
+  NAV_LINKS,
+  NOT_FOUND_PATH,
+  ROUTES,
+  SITE,
+  routeFor,
+} from '../src/site';
 
-const EXPECTED_PATHS = ['/', '/features', '/download', '/docs', '/changelog'];
+const EXPECTED_PATHS = [
+  '/',
+  '/features',
+  '/pro-crosshairs',
+  '/academy',
+  '/download',
+  '/docs',
+  '/changelog',
+];
 
 describe('route table', () => {
-  it('covers exactly the five published routes, in navigation order', () => {
+  it('covers exactly the seven published routes, in navigation order', () => {
     expect(ROUTES.map((route) => route.path)).toEqual(EXPECTED_PATHS);
   });
 
@@ -30,6 +46,8 @@ describe('route table', () => {
     expect(ROUTES.map((route) => route.label)).toEqual([
       'Home',
       'Features',
+      'Pro Crosshairs',
+      'Academy',
       'Download',
       'Documentation',
       'Changelog',
@@ -39,6 +57,19 @@ describe('route table', () => {
   it('drives navigation from the same table it renders', () => {
     expect(NAV_LINKS).toEqual(ROUTES);
     expect(NAV_LINKS.some((route) => route.path === '/download')).toBe(true);
+  });
+
+  it('leaves home and download out of the header text links', () => {
+    // Home is the brand and Download is the call to action at the end of the
+    // bar; repeating either as a text link is noise, and with seven routes the
+    // bar has no room for it.
+    expect(HEADER_LINKS.map((route) => route.path)).toEqual([
+      '/features',
+      '/pro-crosshairs',
+      '/academy',
+      '/docs',
+      '/changelog',
+    ]);
   });
 
   it('keeps the not-found path out of the published route table', () => {
@@ -65,10 +96,20 @@ describe('route table', () => {
     expect(caption).toContain('not a screenshot');
   });
 
-  it('omits a public origin until one exists', () => {
-    // With no SITE_URL at build time the prerender must skip canonical/og:url
-    // rather than publish a placeholder origin.
+  it('publishes a real origin so canonical and og:url are emitted', () => {
+    // An empty fallback silently dropped canonical, og:url and sitemap.xml from
+    // every page in production. The default is the origin that actually serves
+    // the site; SITE_URL still wins when a domain is configured.
     expect(typeof SITE.url).toBe('string');
+    expect(SITE.url.startsWith('https://')).toBe(true);
     expect(SITE.url.endsWith('/')).toBe(false);
+  });
+
+  it('describes the two catalogue pages with counts that come from the product', () => {
+    // The titles carry the real numbers, so a search result states what is
+    // actually installed rather than a marketing adjective.
+    expect(routeFor('/pro-crosshairs')?.title).toContain('40');
+    expect(routeFor('/academy')?.title).toContain('tutorials');
+    expect(routeFor('/changelog')?.description).not.toContain('Nothing has been published');
   });
 });

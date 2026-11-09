@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Callout, SectionHead } from '../components/Blocks';
+import { Callout } from '../components/Blocks';
 import type { ReleaseManifest } from '../site';
 import { latestPublishedEntry, pickArtifact } from '../site';
 import data from '../releases.json';
@@ -82,18 +82,22 @@ const FAQ: ReadonlyArray<{ q: string; a: string }> = [
 export function DocsPage() {
   return (
     <>
-      <section className="section" style={{ paddingTop: 'clamp(56px, 7vw, 96px)' }}>
+      <section
+        className="band world-studio"
+        style={{ paddingBlock: 'clamp(56px,7vw,104px) var(--space-7)' }}
+      >
         <div className="container">
-          <SectionHead
-            level={1}
-            eyebrow="Documentation"
-            title="How crshhx works"
-            lead="Everything below describes the application as it is built in this repository. Where behaviour could not be confirmed on shipped Windows hardware it is labelled as such rather than presented as fact."
-          />
+          <span className="eyebrow">Documentation</span>
+          <h1>How crshhx works.</h1>
+          <p className="section-lead" style={{ maxWidth: '64ch' }}>
+            Everything below describes the application as it is built in this repository. Where
+            behaviour could not be confirmed on shipped Windows hardware it is labelled as such
+            rather than presented as fact.
+          </p>
         </div>
       </section>
 
-      <section className="section" style={{ paddingTop: 0 }}>
+      <section className="band world-studio" style={{ paddingTop: 0 }}>
         <div className="container docs-layout">
           <nav className="toc" aria-label="Documentation sections">
             {TOC.map((item) => (
@@ -186,22 +190,29 @@ export function DocsPage() {
                 what gets drawn. A crosshair has a shape — cross, dot, circle or T-shape — and a set
                 of parameters for that shape.
               </p>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Control</th>
-                    <th>What it does</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {CONTROLS.map(([control, detail]) => (
-                    <tr key={control}>
-                      <td>{control}</td>
-                      <td>{detail}</td>
+              <div
+                className="table-scroll"
+                tabIndex={0}
+                role="region"
+                aria-label="Editor controls and what each one does, scrollable"
+              >
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Control</th>
+                      <th>What it does</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {CONTROLS.map(([control, detail]) => (
+                      <tr key={control}>
+                        <td>{control}</td>
+                        <td>{detail}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
               <p>
                 Changes are tracked in an undo history that coalesces continuous adjustments, so
                 dragging a slider is one undo step rather than dozens. The compare panel holds a
@@ -294,24 +305,31 @@ export function DocsPage() {
                 Assign a crosshair to each slot and record the key that selects that weapon. The
                 defaults are:
               </p>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Slot</th>
-                    <th>Key</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {SLOT_DEFAULTS.map(([slot, key]) => (
-                    <tr key={slot}>
-                      <td>{slot}</td>
-                      <td>
-                        <span className="kbd">{key}</span>
-                      </td>
+              <div
+                className="table-scroll"
+                tabIndex={0}
+                role="region"
+                aria-label="Weapon-slot default keys, scrollable"
+              >
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Slot</th>
+                      <th>Key</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {SLOT_DEFAULTS.map(([slot, key]) => (
+                      <tr key={slot}>
+                        <td>{slot}</td>
+                        <td>
+                          <span className="kbd">{key}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
               <p>
                 Every binding is rebindable and can use modifiers. Input is observed passively:
                 crshhx watches for the recorded key and lets the event continue to the game, so
@@ -382,6 +400,14 @@ export function DocsPage() {
                 </details>
               ))}
             </article>
+
+            <div className="doc-related">
+              <h2 className="doc-related-title">Elsewhere on this site</h2>
+              <Link to="/pro-crosshairs">Pro Crosshairs — the 40 curated designs</Link>
+              <Link to="/academy">Crosshair Academy — the 10 tutorials</Link>
+              <Link to="/features">Features — every area, with rendered visuals</Link>
+              <Link to="/changelog">Changelog — what each release changed</Link>
+            </div>
           </div>
         </div>
       </section>

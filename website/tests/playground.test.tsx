@@ -3,6 +3,7 @@ import { hydrateRoot, type Root } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App';
+import { CATALOGUE } from '../src/catalogue';
 import { renderRoute } from './helpers';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -124,28 +125,78 @@ describe('interactive surfaces', () => {
     expect(problems).toEqual([]);
   });
 
-  it('explores the six feature panels through an accessible tablist', async () => {
+  it('keeps all six feature areas in the document, each reachable by anchor', async () => {
     const { container } = await hydrate('/features');
-    const tabs = [...container.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
-    const panels = [...container.querySelectorAll<HTMLElement>('[role="tabpanel"]')];
-    expect(tabs).toHaveLength(6);
-    expect(panels).toHaveLength(6);
-    expect(tabs[0]?.getAttribute('aria-selected')).toBe('true');
-    expect(panels.filter((panel) => !panel.hasAttribute('hidden'))).toHaveLength(1);
+    for (const id of ['editor', 'presets', 'transfer', 'profiles', 'slots', 'overlay']) {
+      expect(container.querySelector(`#${id}`), id).not.toBeNull();
+    }
+    const links = [
+      ...container.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Feature areas"] a'),
+    ];
+    expect(links).toHaveLength(6);
 
+    // The redesign replaced the tablist with a sequence of sections that each
+    // have their own composition. That is a deliberate trade: a tablist hides
+    // five of the six areas from a crawler and from a reader without script, and
+    // it was the reason the page repeated one layout six times.
+    expect(container.querySelectorAll('[role="tab"]')).toHaveLength(0);
+    expect(container.querySelectorAll('[role="tabpanel"]')).toHaveLength(0);
+    for (const id of ['editor', 'presets', 'transfer', 'profiles', 'slots', 'overlay']) {
+      const section = container.querySelector(`#${id}`);
+      expect((section?.textContent ?? '').length, id).toBeGreaterThan(200);
+    }
+    expect(problems).toEqual([]);
+  });
+
+  it('filters the Pro Crosshairs catalogue without a page reload', async () => {
+    const { container } = await hydrate('/pro-crosshairs');
+    const items = () => container.querySelectorAll('.sheet-item').length;
+
+    // All forty designs are in the prerendered document before any script runs.
+    expect(items()).toBe(CATALOGUE.pro.total);
+
+    const buttons = [...container.querySelectorAll<HTMLButtonElement>('.cat-tab')];
+    expect(buttons).toHaveLength(CATALOGUE.pro.categories.length + 1);
+
+    const precision = buttons.find((button) => button.textContent?.startsWith('Precision'));
+    expect(precision).toBeTruthy();
     await act(async () => {
-      tabs[3]?.click();
+      precision?.click();
     });
 
     expect(problems).toEqual([]);
-    expect(tabs[3]?.getAttribute('aria-selected')).toBe('true');
-    expect(tabs[0]?.getAttribute('aria-selected')).toBe('false');
-    expect(panels[3]?.hasAttribute('hidden')).toBe(false);
-    expect(panels[0]?.hasAttribute('hidden')).toBe(true);
-    expect(panels[3]?.textContent).toContain('Game profiles');
-    // Every panel stays in the document for crawlers and no-JS readers.
-    expect(panels.every((panel) => panel.textContent && panel.textContent.length > 200)).toBe(
-      true,
+    expect(items()).toBe(5);
+    expect(precision?.getAttribute('aria-pressed')).toBe('true');
+    expect(buttons[0]?.getAttribute('aria-pressed')).toBe('false');
+    expect(container.querySelector('[role="status"]')?.textContent).toContain('Showing 5 of 40');
+    // The category's own blurb replaces a title attribute, so keyboard and touch
+    // users get it too.
+    expect(container.querySelector('.cat-blurb')?.textContent).toContain(
+      'Dots and tight crosses',
     );
+
+    await act(async () => {
+      buttons[0]?.click();
+    });
+    expect(items()).toBe(CATALOGUE.pro.total);
+    expect(container.querySelector('.cat-blurb')).toBeNull();
+    expect(problems).toEqual([]);
+  });
+
+  it('renders every Academy step in the document, closed but present', async () => {
+    const { container } = await hydrate('/academy');
+    const lessons = [...container.querySelectorAll<HTMLDetailsElement>('details.lesson')];
+    expect(lessons).toHaveLength(CATALOGUE.academy.total);
+    expect(lessons.every((lesson) => !lesson.open)).toBe(true);
+
+    const renderedSteps = container.querySelectorAll('.lesson-steps li').length;
+    const expectedSteps = CATALOGUE.academy.tutorials.reduce(
+      (total, tutorial) => total + tutorial.steps.length,
+      0,
+    );
+    expect(renderedSteps).toBe(expectedSteps);
+    expect(container.textContent).toContain('Getting started with crshhx');
+    expect(container.textContent).toContain('Fixing common problems');
+    expect(problems).toEqual([]);
   });
 });

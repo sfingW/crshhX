@@ -1,3 +1,4 @@
+import { CATALOGUE } from '../catalogue';
 import { AppWindow } from './AppWindow';
 import { Reticle, type ReticleSpec } from './Reticle';
 
@@ -53,6 +54,10 @@ export const PRESET_SHOWCASE: ReadonlyArray<{
   },
 ];
 
+/** The curated catalogue, exactly as the application ships it. */
+export const PRO_CATEGORIES = CATALOGUE.pro.categories;
+export const PRO_ENTRIES = CATALOGUE.pro.entries;
+
 function Control({ label, value, pct }: { label: string; value: string; pct: number }) {
   return (
     <div className="ctl" aria-hidden="true">
@@ -68,11 +73,11 @@ function Control({ label, value, pct }: { label: string; value: string; pct: num
 
 export function DesignerMock() {
   return (
-    <AppWindow view="Designer">
+    <AppWindow view="Reticle Designer">
       <div className="mock-designer">
         <div className="stage" style={{ minHeight: 250 }}>
           <Reticle spec={PRESET_SHOWCASE[0].spec} size={160} label="Cyan Duelist crosshair preview" />
-          <span className="stage-hud">live preview</span>
+          <span className="stage-label">live preview</span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <Control label="Length" value="4" pct={0.22} />
@@ -94,12 +99,12 @@ export function DesignerMock() {
 
 export function LibraryMock() {
   return (
-    <AppWindow view="Crosshairs">
+    <AppWindow view="Preset Manager">
       <div className="chips" aria-hidden="true">
         <span className="chip">All games</span>
         <span className="chip">Favourites</span>
         <span className="chip">Folders</span>
-        <span className="chip">258 presets</span>
+        <span className="chip">{CATALOGUE.vault.total} presets</span>
       </div>
       <div className="tiles">
         {PRESET_SHOWCASE.map((preset, index) => (
@@ -140,7 +145,7 @@ export function SlotsMock() {
           </div>
         ))}
       </div>
-      <div className="chips" aria-hidden="true">
+      <div className="chips" aria-hidden="true" style={{ marginTop: 12, marginBottom: 0 }}>
         <span className="chip">passive input hook</span>
         <span className="chip">game keeps every keypress</span>
       </div>
@@ -150,16 +155,111 @@ export function SlotsMock() {
 
 export function OverlayMock() {
   return (
-    <AppWindow view="Position">
+    <AppWindow view="4:3 & Position">
       <div className="stage" style={{ minHeight: 300 }}>
         <Reticle
           spec={{ ...PRESET_SHOWCASE[0].spec, scale: 1.6 }}
           size={190}
           label="Overlay crosshair, centred on screen"
         />
-        <span className="stage-hud">
+        <span className="stage-label">
           overlay · <span className="kbd">F10</span> toggle · <span className="kbd">F9</span> cycle
         </span>
+      </div>
+    </AppWindow>
+  );
+}
+
+/** Aim-down-sights morphing and firing bloom, with the real hotkeys. */
+export function KeybindsMock() {
+  return (
+    <AppWindow view="Keybinds & ADS">
+      <div className="slots">
+        <div className="slot-row is-active">
+          <span className="slot-name">ADS morph</span>
+          <span className="kbd">RMB</span>
+          <span className="slot-name">shrink · 0.6</span>
+          <span className="slot-toggle on" aria-hidden="true" />
+        </div>
+        <div className="slot-row">
+          <span className="slot-name">Firing bloom</span>
+          <span className="kbd">+5 px</span>
+          <span className="slot-name">decay 120 ms</span>
+          <span className="slot-toggle on" aria-hidden="true" />
+        </div>
+        <div className="slot-row">
+          <span className="slot-name">Toggle overlay</span>
+          <span className="kbd">F10</span>
+          <span className="slot-name">global</span>
+          <span className="slot-toggle on" aria-hidden="true" />
+        </div>
+        <div className="slot-row">
+          <span className="slot-name">Cycle preset</span>
+          <span className="kbd">F9</span>
+          <span className="slot-name">global</span>
+          <span className="slot-toggle on" aria-hidden="true" />
+        </div>
+      </div>
+      <div className="chips" aria-hidden="true" style={{ marginTop: 12, marginBottom: 0 }}>
+        <span className="chip">shrink</span>
+        <span className="chip">dot-only</span>
+        <span className="chip">fade</span>
+      </div>
+    </AppWindow>
+  );
+}
+
+/**
+ * The Pro Crosshairs preview bench: two real catalogue entries compared on the
+ * same backdrop, with the bench's real controls named. Both designs come from
+ * the generated catalogue, so the reticles are the shipped parameters.
+ */
+export function ProBenchMock({ leftIndex = 0, rightIndex = 12 }: { leftIndex?: number; rightIndex?: number }) {
+  const left = PRO_ENTRIES[leftIndex];
+  const right = PRO_ENTRIES[rightIndex];
+  return (
+    <AppWindow view="Pro Crosshairs">
+      <div className="chips" aria-hidden="true">
+        {PRO_CATEGORIES.slice(0, 4).map((category, index) => (
+          <span key={category.id} className={`chip${index === 0 ? ' is-active' : ''}`}>
+            {category.label}
+          </span>
+        ))}
+      </div>
+      <div className="stage" style={{ minHeight: 200, gridTemplateColumns: '1fr 1fr' }}>
+        <div style={{ display: 'grid', placeItems: 'center', gap: 8 }}>
+          <Reticle spec={left.spec} size={92} label={`${left.name} crosshair`} />
+          <span className="tile-name">{left.name}</span>
+        </div>
+        <div style={{ display: 'grid', placeItems: 'center', gap: 8 }}>
+          <Reticle spec={right.spec} size={92} label={`${right.name} crosshair`} />
+          <span className="tile-name">{right.name}</span>
+        </div>
+        <span className="stage-label">compare · zoom 4× · backdrop: precision grid</span>
+      </div>
+    </AppWindow>
+  );
+}
+
+/** The Academy's lesson list, with the real tutorial titles and completion. */
+export function AcademyMock() {
+  const lessons = CATALOGUE.academy.tutorials.slice(0, 4);
+  return (
+    <AppWindow view="Crosshair Academy">
+      <div className="slots">
+        {lessons.map((lesson, index) => (
+          <div key={lesson.id} className={`slot-row${index === 0 ? ' is-active' : ''}`}>
+            <span className="slot-name">{lesson.title}</span>
+            <span className="kbd">{String(lesson.steps.length)}</span>
+            <span className="slot-name">{index === 0 ? 'in progress' : 'not started'}</span>
+            <span className={`slot-toggle${index === 0 ? ' on' : ''}`} aria-hidden="true" />
+          </div>
+        ))}
+      </div>
+      <div className="chips" aria-hidden="true" style={{ marginTop: 12, marginBottom: 0 }}>
+        <span className="chip">{CATALOGUE.academy.total} tutorials</span>
+        <span className="chip">live demos</span>
+        <span className="chip">labelled illustrations</span>
       </div>
     </AppWindow>
   );

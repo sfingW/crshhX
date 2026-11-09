@@ -140,3 +140,53 @@ export function WinGlyphs() {
     </span>
   );
 }
+
+/** Favourites, as the application's Saved & Favorites view. */
+export function IconStar({ title }: IconProps) {
+  return (
+    <svg {...base(title)}>
+      <path d="M12 4.5l2.3 4.9 5.2.7-3.8 3.7.9 5.2-4.6-2.6-4.6 2.6.9-5.2L4.5 10l5.2-.7L12 4.5Z" />
+    </svg>
+  );
+}
+
+/** The Pro Crosshairs catalogue. */
+export function IconTrophy({ title }: IconProps) {
+  return (
+    <svg {...base(title)}>
+      <path d="M8 4.5h8v4a4 4 0 0 1-8 0v-4Z" />
+      <path d="M8 6H5.5v1.5A3 3 0 0 0 8 10.4M16 6h2.5v1.5A3 3 0 0 1 16 10.4" />
+      <path d="M12 12.5v3.5M9 19.5h6M10 16h4l.7 3.5h-5.4L10 16Z" />
+    </svg>
+  );
+}
+
+/** The Crosshair Academy. */
+export function IconBook({ title }: IconProps) {
+  return (
+    <svg {...base(title)}>
+      <path d="M4 5.5h6a2 2 0 0 1 2 2v11a2 2 0 0 0-2-2H4v-11Z" />
+      <path d="M20 5.5h-6a2 2 0 0 0-2 2v11a2 2 0 0 1 2-2h6v-11Z" />
+    </svg>
+  );
+}
+
+/** Monitor placement and stretched-resolution compensation. */
+export function IconMove({ title }: IconProps) {
+  return (
+    <svg {...base(title)}>
+      <path d="M12 3.5v17M3.5 12h17" />
+      <path d="M12 3.5 9.8 6M12 3.5 14.2 6M12 20.5 9.8 18M12 20.5l2.2-2.5M3.5 12 6 9.8M3.5 12 6 14.2M20.5 12 18 9.8M20.5 12 18 14.2" />
+    </svg>
+  );
+}
+
+/** The Ban-Safety Audit view: what the overlay does and does not touch. */
+export function IconShield({ title }: IconProps) {
+  return (
+    <svg {...base(title)}>
+      <path d="M12 3.5 19 6v5.5c0 4-3 7.2-7 9-4-1.8-7-5-7-9V6l7-2.5Z" />
+      <path d="M9.2 12.2 11.3 14.3 15 10.6" />
+    </svg>
+  );
+}

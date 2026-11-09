@@ -1,0 +1,109 @@
+# The website's own quality gate.
+#
+# This file exists because of a concrete failure, not as a precaution. Until now
+# the only CI job that ran on a pull request was `windows-release.yml`, whose
+# "Tests, typechecks, production build" job runs at the repository root against
+# the Electron application: `npm ci`, `npm test`, `tsc -p tsconfig.json`,
+# `npm run typecheck:main`, `npm run build`. It never enters `website/`.
+#
+# The result was that a pull request touching only the website showed a green
+# "Tests, typechecks, production build" check that had tested none of it. A
+# typecheck error in `website/vite.config.ts` sat undetected, and a route
+# description 5 characters over the project's own documented limit reached
+# `main` behind a passing build. `HOSTING.md` sketched this workflow and marked
+# it "not enabled, because nothing is published yet" — the site is published now.
+#
+# Separation is the point of this being its own file. `website/` has its own
+# package.json and lockfile, so nothing here installs the application's
+# dependencies, and nothing here can run `electron-builder`. Equally,
+# `windows-release.yml` must never build or deploy the website. A website change
+# cannot break a release, and a release cannot break the website.
+
+name: website
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'website/**'
+      - '.github/workflows/website.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'website/**'
+      - '.github/workflows/website.yml'
+  workflow_dispatch:
+
+# Read-only. This job builds and tests; it publishes nothing. Deployment to
+# Cloudflare Pages happens through the Pages GitHub integration, not here, so
+# this workflow needs no write access and gets none.
+permissions:
+  contents: read
+
+concurrency:
+  group: website-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Website tests, typecheck, build and dist verification
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22, matching the version HOSTING.md documents for this project.
+      # Vite 6 supports ^18 || ^20 || >=22; if the Cloudflare Pages project is
+      # pinned to an older runtime the build there is the one to trust, so keep
+      # this in step with whatever Pages actually uses.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install website dependencies
+        run: npm ci --no-audit --no-fund
+
+      # The two catalogue pages (Pro Crosshairs, Crosshair Academy) render data
+      # extracted from the desktop application by scripts/extract-catalogue.mjs
+      # into src/catalogue.json. The website never imports application code at
+      # build time; the JSON is committed instead, so this step fails the build
+      # when the application's presets or tutorials have changed and the
+      # committed copy has not been regenerated. Without it the site would keep
+      # describing the product as it was.
+      - name: Check the extracted product catalogue is current
+        run: npm run extract:check
+
+      # Both projects are expected to be clean. `tsconfig.node.json` carries the
+      # Node globals for vite.config.ts so that `process` is typed on the build
+      # side without leaking Node into the browser-side type environment.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      # Runs extract:check, build:client, build:server, the prerender of every
+      # route, and then scripts/verify-dist.mjs, which fails the build if a route rendered empty,
+      # if SEO metadata is missing, if a download URL or SHA-256 does not come
+      # from the release manifest, if a byte budget is exceeded, if a third-party
+      # origin appears anywhere in the output, or if a text colour falls below
+      # 4.5:1 against the surface it sits on.
+      - name: Build, prerender and verify dist
+        run: npm run build
+
+      - name: Report the built artifact
+        run: |
+          echo "Prerendered pages:"
+          find dist -name '*.html' | sort | while read -r f; do
+            printf '  %-34s %7s B\n' "$f" "$(wc -c <"$f")"
+          done
+          echo "Assets:"
+          find dist/assets -type f | sort | while read -r f; do
+            printf '  %-46s %7s B\n' "$(basename "$f")" "$(wc -c <"$f")"
+          done

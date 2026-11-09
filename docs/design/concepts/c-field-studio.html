@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Direction C — Field &amp; Studio · crshhx concept</title>
+<!-- CONCEPT PREVIEW ONLY. Webfonts linked so the direction can be judged with its
+     real display face. Never ships: production self-hosts woff2 subsets and
+     verify-dist.mjs fails the build on any non-first-party origin. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* two worlds: the field (the game, dark) and the studio (the editor, light) */
+    --field:#0B0C0E; --field2:#141619; --field3:#1D2025; --fieldline:#282C33;
+    --studio:#F4F4F2; --studio2:#EAEAE6; --studioline:#D8D8D2;
+    --onfield:#F0F1F3; --onfield2:#9BA1A9; --onfield3:#6E747C;
+    --onstudio:#14161A; --onstudio2:#4C5058; --onstudio3:#7B8089;
+    --accent:#00E599; --accent-ink:#06231C; --deep:#0A6B4C;
+    --display:'Archivo','Inter',system-ui,sans-serif;
+    --body:'Inter',system-ui,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+    --gut:clamp(20px,5vw,56px);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--field);color:var(--onfield);font-family:var(--body);
+    font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1320px;margin-inline:auto;padding-inline:var(--gut)}
+  .mono{font-family:var(--mono);font-size:12px;letter-spacing:.03em}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;
+    height:48px;padding:0 26px;border-radius:4px;font-family:var(--display);
+    font-size:15.5px;font-weight:700;letter-spacing:-.01em;
+    transition:transform .16s cubic-bezier(.2,.6,.2,1),background .16s,border-color .16s}
+  .btn-accent{background:var(--accent);color:var(--accent-ink)}
+  .btn-accent:hover{background:#4CF0BC;transform:translateY(-1px)}
+  .btn-ghost{border:1px solid var(--fieldline);color:var(--onfield)}
+  .btn-ghost:hover{border-color:#3D434C;background:var(--field2)}
+  .btn-ink{background:var(--onstudio);color:var(--studio)}
+  .btn-ink:hover{background:#2A2E35}
+
+  /* nav sits on the field */
+  header{position:sticky;top:0;z-index:30;background:rgba(11,12,14,.86);
+    backdrop-filter:blur(14px);border-bottom:1px solid var(--fieldline)}
+  .nav{display:flex;align-items:center;gap:30px;height:66px}
+  .mark{display:flex;align-items:center;gap:10px;font-family:var(--display);
+    font-weight:800;letter-spacing:-.03em;font-size:18px}
+  .nav ul{display:flex;gap:26px;list-style:none;margin:0;padding:0;font-size:14.5px;color:var(--onfield2)}
+  .nav ul a:hover{color:var(--onfield)}
+  .spacer{flex:1}
+  .btn-sm{height:38px;padding:0 18px;font-size:14px}
+
+  /* HERO — the seam. Field on the left, studio on the right, crosshair on the line. */
+  .hero{position:relative;border-bottom:1px solid var(--fieldline)}
+  .split{display:grid;grid-template-columns:1fr 1fr;min-height:min(86vh,760px)}
+  .half{padding:clamp(48px,7vw,96px) var(--gut);display:flex;flex-direction:column;justify-content:center}
+  .half-field{background:
+      radial-gradient(120% 90% at 30% 40%, #191C22 0%, #0B0C0E 62%);
+    color:var(--onfield)}
+  .half-studio{background:var(--studio);color:var(--onstudio);
+    border-left:1px solid var(--studioline)}
+  .tagline{font-family:var(--mono);font-size:11.5px;letter-spacing:.2em;
+    text-transform:uppercase;margin-bottom:24px}
+  .half-field .tagline{color:var(--accent)}
+  .half-studio .tagline{color:var(--deep)}
+  h1{font-family:var(--display);font-weight:800;margin:0;letter-spacing:-.05em;
+    font-size:clamp(44px,5.6vw,86px);line-height:.92}
+  .half-studio h1{font-size:clamp(30px,3.1vw,46px);font-weight:700;letter-spacing:-.035em;line-height:1.04}
+  .sub{margin:22px 0 0;max-width:40ch;color:var(--onfield2);font-size:18px;line-height:1.55}
+  .half-studio .sub{color:var(--onstudio2);max-width:44ch}
+  .cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:34px}
+  .req{font-family:var(--mono);font-size:11.5px;color:var(--onfield3);margin-top:20px}
+
+  /* the reticle straddles the seam — the product literally sits between the two */
+  .seam{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:clamp(150px,17vw,240px);aspect-ratio:1;display:grid;place-items:center;
+    background:transparent;z-index:5;pointer-events:none}
+  .seam::before{content:'';position:absolute;inset:-14%;border-radius:50%;
+    background:radial-gradient(closest-side,rgba(0,0,0,.55),rgba(0,0,0,0))}
+  .seam svg{position:relative}
+
+  /* studio-side editor controls, drawn as the real control set */
+  .ctl{display:grid;gap:14px;margin-top:30px;max-width:420px}
+  .ctl-row{display:grid;grid-template-columns:88px 1fr 46px;gap:12px;align-items:center;
+    font-family:var(--mono);font-size:11.5px;color:var(--onstudio3)}
+  .track{height:3px;background:var(--studioline);border-radius:2px;position:relative}
+  .track i{position:absolute;left:0;top:0;bottom:0;background:var(--deep);border-radius:2px}
+  .track b{position:absolute;top:50%;width:13px;height:13px;border-radius:50%;
+    background:var(--studio);border:2px solid var(--deep);transform:translate(-50%,-50%)}
+  .ctl-row span:last-child{text-align:right;color:var(--onstudio)}
+
+  /* bands alternate world, which is the whole idea */
+  .band{padding:clamp(64px,8vw,120px) 0}
+  .band-studio{background:var(--studio);color:var(--onstudio);border-bottom:1px solid var(--studioline)}
+  .band-field{background:var(--field);color:var(--onfield);border-bottom:1px solid var(--fieldline)}
+  .bhead{display:flex;align-items:baseline;gap:18px;margin-bottom:clamp(28px,4vw,52px);flex-wrap:wrap}
+  .bnum{font-family:var(--mono);font-size:11.5px;letter-spacing:.18em}
+  .band-studio .bnum{color:var(--deep)}
+  .band-field .bnum{color:var(--accent)}
+  h2{font-family:var(--display);font-weight:800;margin:0;letter-spacing:-.045em;
+    font-size:clamp(32px,4.4vw,64px);line-height:.98}
+  .bhead p{margin:0;max-width:48ch;font-size:16.5px}
+  .band-studio .bhead p{color:var(--onstudio2)}
+  .band-field .bhead p{color:var(--onfield2)}
+  .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+    gap:clamp(20px,3vw,44px)}
+  .cols h3{font-family:var(--display);font-weight:700;font-size:19px;margin:0 0 8px;letter-spacing:-.02em}
+  .cols p{margin:0;font-size:14.5px;line-height:1.55}
+  .band-studio .cols p{color:var(--onstudio2)}
+  .band-field .cols p{color:var(--onfield2)}
+  .rule{height:1px;margin-bottom:16px}
+  .band-studio .rule{background:var(--studioline)}
+  .band-field .rule{background:var(--fieldline)}
+
+  /* slots rendered as a key row */
+  .keys{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+  .key{display:flex;align-items:center;gap:10px;border:1px solid var(--fieldline);
+    background:var(--field2);border-radius:6px;padding:10px 14px}
+  .key b{font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:500}
+  .key span{font-size:13.5px;color:var(--onfield2)}
+
+  /* download: one panel, split down the middle like the hero */
+  .dlpanel{display:grid;grid-template-columns:1fr 1fr;border-radius:8px;overflow:hidden;
+    border:1px solid var(--fieldline)}
+  .dlside{padding:clamp(26px,3.4vw,44px)}
+  .dl-a{background:var(--field2)}
+  .dl-b{background:var(--studio);color:var(--onstudio)}
+  .dlside h3{font-family:var(--display);font-weight:800;font-size:clamp(24px,2.6vw,34px);
+    margin:10px 0 0;letter-spacing:-.035em}
+  .dlside p{margin:12px 0 22px;font-size:14.5px;max-width:40ch}
+  .dl-a p{color:var(--onfield2)}
+  .dl-b p{color:var(--onstudio2)}
+  .pill{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase}
+  .dl-a .pill{color:var(--accent)}
+  .dl-b .pill{color:var(--onstudio3)}
+  .hash{font-family:var(--mono);font-size:11px;color:var(--onfield3);margin-top:16px;
+    word-break:break-all;max-width:44ch}
+
+  footer{padding:48px 0;color:var(--onfield3);font-size:13.5px}
+  .foot{display:flex;flex-wrap:wrap;gap:18px;justify-content:space-between}
+  .foot nav{display:flex;gap:20px}
+  .foot a:hover{color:var(--onfield)}
+
+  @media (max-width:980px){
+    .split{grid-template-columns:1fr}
+    .half-studio{border-left:0;border-top:1px solid var(--studioline)}
+    .seam{left:auto;right:var(--gut);top:auto;bottom:-40px;transform:none;
+      width:120px}
+    .dlpanel{grid-template-columns:1fr}
+    .nav ul{display:none}
+    .hero{padding-bottom:56px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="mark" href="#">
+      <svg width="18" height="18" viewBox="0 0 120 120" aria-hidden="true">
+        <g fill="#00E599"><rect x="57" y="14" width="6" height="30" rx="3"/>
+        <rect x="57" y="76" width="6" height="30" rx="3"/>
+        <rect x="14" y="57" width="30" height="6" rx="3"/>
+        <rect x="76" y="57" width="30" height="6" rx="3"/></g>
+      </svg>crshhx
+    </a>
+    <ul><li><a href="#">Features</a></li><li><a href="#">Documentation</a></li><li><a href="#">Changelog</a></li></ul>
+    <span class="spacer"></span>
+    <span class="mono" style="color:var(--onfield3)">v1.1.0</span>
+    <a class="btn btn-accent btn-sm" href="#">Download</a>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="split">
+    <div class="half half-field">
+      <div class="tagline">The field — what the game sees</div>
+      <h1>Drawn over<br>the game.<br>Never inside it.</h1>
+      <p class="sub">A topmost overlay window that renders nothing but the reticle.
+        No injection, no memory reads, no patched processes — and the keyboard is
+        observed passively, so every keypress still reaches the game.</p>
+      <div class="cta"><a class="btn btn-accent" href="#">Download for Windows</a></div>
+      <div class="req">v1.1.0 · Windows 10 &amp; 11 · 64-bit · 84.7 MB</div>
+    </div>
+
+    <div class="half half-studio">
+      <div class="tagline">The studio — what you control</div>
+      <h2 style="font-family:var(--display);font-weight:800;font-size:clamp(30px,3.1vw,46px);
+                 letter-spacing:-.035em;line-height:1.04;margin:0">
+        Per-arm geometry,<br>not a colour picker.</h2>
+      <p class="sub">Length, thickness, gap, rotation, outlines, centre dot, spread ring
+        and glow — each editable per arm, undoable, and diffable against a held snapshot.</p>
+      <div class="ctl">
+        <div class="ctl-row"><span>LENGTH</span><span class="track"><i style="width:33%"></i><b style="left:33%"></b></span><span>4.0</span></div>
+        <div class="ctl-row"><span>THICKNESS</span><span class="track"><i style="width:33%"></i><b style="left:33%"></b></span><span>2.0</span></div>
+        <div class="ctl-row"><span>GAP</span><span class="track"><i style="width:44%"></i><b style="left:44%"></b></span><span>2.0</span></div>
+        <div class="ctl-row"><span>OUTLINE</span><span class="track"><i style="width:16%"></i><b style="left:16%"></b></span><span>1</span></div>
+        <div class="ctl-row"><span>ROTATION</span><span class="track"><i style="width:0%"></i><b style="left:0%"></b></span><span>0°</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="seam">
+    <svg width="100%" height="100%" viewBox="0 0 120 120" role="img"
+         aria-label="Crosshair preview drawn across the boundary between game and editor">
+      <g fill="#000" opacity=".85"><rect x="55" y="33" width="10" height="28" rx="5"/>
+        <rect x="55" y="59" width="10" height="28" rx="5"/>
+        <rect x="33" y="55" width="28" height="10" rx="5"/>
+        <rect x="59" y="55" width="28" height="10" rx="5"/>
+        <circle cx="60" cy="60" r="5"/></g>
+      <g fill="#35E0FF"><rect x="57" y="35" width="6" height="24" rx="3"/>
+        <rect x="57" y="61" width="6" height="24" rx="3"/>
+        <rect x="35" y="57" width="24" height="6" rx="3"/>
+        <rect x="61" y="57" width="24" height="6" rx="3"/>
+        <circle cx="60" cy="60" r="3"/></g>
+    </svg>
+  </div>
+</section>
+
+<section class="band band-field">
+  <div class="wrap">
+    <div class="bhead">
+      <span class="bnum">01 / WEAPON SLOTS</span>
+      <h2>Five slots.<br>Your keys.</h2>
+      <p>Record the key that selects each weapon and bind a reticle to it. Defaults are
+        rebindable, and a key already used by another slot is refused with the conflict named.</p>
+    </div>
+    <div class="keys">
+      <span class="key"><b>1</b><span>Shotgun</span></span>
+      <span class="key"><b>2</b><span>Rifle</span></span>
+      <span class="key"><b>3</b><span>SMG</span></span>
+      <span class="key"><b>4</b><span>Sniper</span></span>
+      <span class="key"><b>5</b><span>Utility</span></span>
+      <span class="key"><b>F10</b><span>Toggle overlay</span></span>
+      <span class="key"><b>F9</b><span>Cycle preset</span></span>
+    </div>
+  </div>
+</section>
+
+<section class="band band-studio">
+  <div class="wrap">
+    <div class="bhead">
+      <span class="bnum">02 / STUDIO</span>
+      <h2>Everything stays<br>on your machine.</h2>
+      <p>Library, folders, favourites, profiles and slot bindings live in your roaming
+        application-data directory — kept on update and on uninstall.</p>
+    </div>
+    <div class="cols">
+      <div><div class="rule"></div><h3>258 built-in presets</h3>
+        <p>Cross 98, dot 59, circle 54, chevron 35 and T-shape 12, tagged by game.
+          Filed in a sidecar, so a built-in is never modified.</p></div>
+      <div><div class="rule"></div><h3>Versioned transfer</h3>
+        <p>Export writes your values as they are. Import lists every entry, conflict and
+          repair first, and applies only what you approve.</p></div>
+      <div><div class="rule"></div><h3>Game profiles</h3>
+        <p>Switch automatically when a game reaches the foreground — or restrict a profile
+          so it stops switching rather than guessing.</p></div>
+      <div><div class="rule"></div><h3>Stretched compensation</h3>
+        <p>4:3, 16:10, 5:4 and custom ratios keep the reticle square, plus ADS morphing
+          and firing bloom with configurable decay.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="band band-field">
+  <div class="wrap">
+    <div class="bhead">
+      <span class="bnum">03 / DOWNLOAD</span>
+      <h2>Two builds.</h2>
+      <p>Same library, same settings. Choose how you want it installed.</p>
+    </div>
+    <div class="dlpanel">
+      <div class="dlside dl-a">
+        <div class="pill">Recommended</div>
+        <h3>Installer</h3>
+        <p>One-click installation with a Start menu shortcut. Your library is kept outside
+          the install folder, so updating never touches it.</p>
+        <a class="btn btn-accent" href="#">Download · 84.7 MB</a>
+        <div class="hash">sha256 bed1e654a6ce8dc0226c77fd8872da848e2d0a2f3eba6bb7dd104084dccac45d</div>
+      </div>
+      <div class="dlside dl-b">
+        <div class="pill">No installation</div>
+        <h3>Portable</h3>
+        <p>Run it from a drive or a USB stick. Your library lives in your roaming profile
+          and follows you between machines.</p>
+        <a class="btn btn-ink" href="#">Download · 77.7 MB</a>
+        <div class="hash" style="color:var(--onstudio3)">sha256 037476deef04f4a56de5a58860dc7c61e80a9c8abab078c183d63a0e8ba842e2</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <span>crshhx — Crshhx Crosshair Studio. Not code-signed; SmartScreen may warn on first run.</span>
+    <nav><a href="#">Features</a><a href="#">Documentation</a><a href="#">Changelog</a><a href="#">Repository</a></nav>
+  </div>
+</footer>
+
+</body>
+</html>

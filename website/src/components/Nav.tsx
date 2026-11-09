@@ -1,15 +1,12 @@
 import { useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { NAV_LINKS } from '../site';
+import { HEADER_LINKS, NAV_LINKS } from '../site';
 import { BrandMark } from './Brand';
 import { IconClose, IconDownload, IconMenu } from './icons';
-
-const HEADER_LINKS = NAV_LINKS.filter((route) => route.path !== '/download');
 
 export function Nav() {
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
-
 
   return (
     <header className="nav">
@@ -19,6 +16,7 @@ export function Nav() {
           to="/"
           onClick={() => setOpen(false)}
           aria-label="crshhx — home"
+          aria-current={pathname === '/' ? 'page' : undefined}
         >
           <BrandMark />
           <span>crshhx</span>
@@ -31,7 +29,6 @@ export function Nav() {
               key={route.path}
               className="nav-link"
               to={route.path}
-              end={route.path === '/'}
               onClick={() => setOpen(false)}
             >
               {route.label}

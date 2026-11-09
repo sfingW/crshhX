@@ -98,7 +98,7 @@ export function Playground() {
   ].join('\n');
 
   return (
-    <figure className="hud pg">
+    <figure className="pg">
       <div className="pg-head">
         <span>crosshair playground</span>
         <span className="pg-mode">interactive</span>

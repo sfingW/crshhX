@@ -57,7 +57,14 @@ async function main() {
     robots: 'noindex',
   });
 
-  const report = [];
+  const PRIORITY = {
+  '/': '1.0',
+  '/download': '0.9',
+  '/features': '0.8',
+  '/pro-crosshairs': '0.8',
+};
+
+const report = [];
 
   for (const page of pages) {
     const appHtml = render(page.path);
@@ -110,7 +117,10 @@ async function main() {
     const urls = ROUTES.map((route) => {
       const loc =
         route.path === '/' ? `${siteUrl}${baseNoSlash}/` : `${siteUrl}${baseNoSlash}${route.path}`;
-      const priority = route.path === '/' ? '1.0' : route.path === '/download' ? '0.9' : '0.7';
+      // Priorities are relative, and they follow the order a visitor should be
+      // led through: the product statement, the download decision, the pages
+      // that show the shipped catalogue, then the reference material.
+      const priority = PRIORITY[route.path] ?? '0.7';
       return `  <url>\n    <loc>${escapeAttr(loc)}</loc>\n    <lastmod>${SITE.updated}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
     }).join('\n');
     const sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;

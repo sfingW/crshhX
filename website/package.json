@@ -6,12 +6,15 @@
   "description": "Official website for crshhx (Crshhx Crosshair Studio). Deliberately isolated from the desktop application: its own dependencies, build, tests and deploy configuration.",
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:client && npm run build:server && node scripts/prerender.mjs",
+    "build": "npm run extract:check && npm run build:client && npm run build:server && node scripts/prerender.mjs && npm run verify",
     "build:client": "vite build",
     "build:server": "vite build --ssr src/entry-server.tsx --outDir dist-server",
+    "verify": "node scripts/verify-dist.mjs",
     "preview": "vite preview",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "test": "vitest run",
+    "extract": "node scripts/extract-catalogue.mjs",
+    "extract:check": "node scripts/extract-catalogue.mjs --check"
   },
   "dependencies": {
     "react": "^19.0.0",
@@ -19,9 +22,10 @@
     "react-router-dom": "^6.30.0"
   },
   "devDependencies": {
+    "@fontsource/archivo": "^5.3.0",
     "@fontsource/inter": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.2.0",
-    "@fontsource/space-grotesk": "^5.2.0",
+    "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
