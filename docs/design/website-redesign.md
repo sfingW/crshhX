@@ -1398,6 +1398,18 @@ subsets, `font-display: swap`. The concept pages' Google Fonts `<link>`s never e
   column below 640px, and the three-column requirements table scrolls in a focusable region. The
   split hero stacks below 980px with the reticle re-anchored to the field half, as §17 required.
   Navigation switches to a menu below 1024px.
+* **Routes and assets, over HTTP** — serving the built `dist/` locally returned `200` with the
+  correct document and the correct `<h1>` for all seven routes, `404` with the custom page for an
+  unknown path, and `200` with correct content types for the CSS, JS, woff2 and sitemap.
+* **Cloudflare Pages built the branch** — pushing it made the Pages Git integration build and
+  report `Deploy successful!` for commit `3347d38`, producing a *preview* deployment (production
+  is `main` and was not touched: `https://crshhx.pages.dev/` still serves the previous design, its
+  `<h1>` still "Your crosshair, exactly where you put it."). Two things this proves that a local
+  build cannot: their environment satisfies `extract:check`'s need to read the application's
+  catalogue modules one directory above `website/`, and the site deploys there with no dashboard
+  change. Fetching the preview returned the new home page, `/features` and `/pro-crosshairs` with
+  their full prerendered content — all 40 designs, the real application navigation inside the
+  mockups, the disclosure captions, and the download button pointing at the release asset.
 
 ### 20.5 What was **not** verified — stated plainly
 
@@ -1411,7 +1423,8 @@ site. Specifically **not** verified:
   overflow — asserted from CSS structure, not measured in a viewport;
 * keyboard traversal and screen-reader behaviour in a real assistive technology;
 * Lighthouse, Core Web Vitals, field or lab performance, and paint behaviour with the fonts;
-* the Cloudflare Pages build and deployment, whose configuration is dashboard-only;
+* the Cloudflare Pages *production* deployment and its dashboard configuration — the branch built
+  as a preview (§20.4), but no production deploy happened and the dashboard cannot be read;
 * the Windows application itself on physical hardware.
 
 The CSS in this redesign is therefore reasoned about numerically (every colour measured, every
@@ -1419,8 +1432,42 @@ layout described in intrinsic grid terms) and checked structurally, but its appe
 been seen by me. **Reviewing the rendered pages in a browser is the owner's step, and it is the
 one gap this record cannot close.**
 
-### 20.6 Git
+One observation from reading the deployed pages is recorded in §20.6 rather than resolved there.
+
+### 20.6 Cloudflare Pages: what pushing the branch did
+
+Pushing the branch made the Pages Git integration build it and report **`Deploy successful!`** for
+commit `3347d38`, with a preview at `https://dedb5063.crshhx.pages.dev` and a branch preview at
+`https://arena-349e1219-crshhx.crshhx.pages.dev`. That is the project's own configuration doing
+what it does for every branch; it was not a deploy step taken here, and **production was not
+touched** — `https://crshhx.pages.dev/` still serves `main`, which is still the previous design
+(its `<h1>` remains "Your crosshair, exactly where you put it."). Nothing merges, releases or
+deploys without approval.
+
+Two useful things the preview proves that a local build cannot:
+
+1. **The Pages build environment satisfies the new `extract:check` step.** The build begins by
+   reading the desktop application's catalogue modules one directory above `website/`. A host that
+   checked out `website/` alone would fail there; Cloudflare clones the repository and only changes
+   the working directory, and the successful build confirms it.
+2. **The deployed documents are the prerendered ones.** Reading the preview returned all 40 designs
+   with their real names, descriptions, tiers and topologies on `/pro-crosshairs`, the six areas on
+   `/features`, and the new home page with its rail of counted facts — content that exists in the
+   static HTML rather than only after hydration.
+
+**One observation, recorded rather than resolved.** Reading a route through this environment's page
+fetcher reported `<title>Page not found — crshhx</title>` for `/features` and `/pro-crosshairs`
+while returning those pages' correct content, and reported the right title for `/`. The same thing
+happens on **production `/features`, which has been live and working since before this branch**, so
+it is a property of the fetch path (Pages answers `/features` with a redirect to `/features/`) and
+not something this redesign introduced. The prerendered files are unambiguous — each route carries
+exactly its own `<title>`, asserted by the build gate — and `*.pages.dev` cannot be requested
+directly from here, so no status code could be read to settle it. It costs one look in a browser:
+open a route and check the tab title. If a directory route really did answer 404, the fix would be
+to emit a flat `features.html` beside each directory index, or add a `_redirects` file.
+
+### 20.7 Git
 
 All work is on `arena/349e1219-crshhx`, branched from `4ecedfc`. Nothing was pushed to `main`,
-no release was created, and nothing was deployed. A pull request is opened for review; merging,
-releasing and deploying wait for the owner's approval.
+no release was created, and no production deployment was made. Pull request #10 is open for
+review; merging, releasing and deploying wait for the owner's approval.
