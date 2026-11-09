@@ -69,6 +69,16 @@ jobs:
       - name: Install website dependencies
         run: npm ci --no-audit --no-fund
 
+      # The two catalogue pages (Pro Crosshairs, Crosshair Academy) render data
+      # extracted from the desktop application by scripts/extract-catalogue.mjs
+      # into src/catalogue.json. The website never imports application code at
+      # build time; the JSON is committed instead, so this step fails the build
+      # when the application's presets or tutorials have changed and the
+      # committed copy has not been regenerated. Without it the site would keep
+      # describing the product as it was.
+      - name: Check the extracted product catalogue is current
+        run: npm run extract:check
+
       # Both projects are expected to be clean. `tsconfig.node.json` carries the
       # Node globals for vite.config.ts so that `process` is typed on the build
       # side without leaking Node into the browser-side type environment.
@@ -78,8 +88,8 @@ jobs:
       - name: Tests
         run: npm test
 
-      # Runs build:client, build:server, the prerender of every route, and then
-      # scripts/verify-dist.mjs, which fails the build if a route rendered empty,
+      # Runs extract:check, build:client, build:server, the prerender of every
+      # route, and then scripts/verify-dist.mjs, which fails the build if a route rendered empty,
       # if SEO metadata is missing, if a download URL or SHA-256 does not come
       # from the release manifest, if a byte budget is exceeded, if a third-party
       # origin appears anywhere in the output, or if a text colour falls below
