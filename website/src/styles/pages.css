@@ -269,65 +269,229 @@
 
 /* Download page ------------------------------------------------------------ */
 
-.dl-grid {
+/* Release strip: one quiet line of facts under the heading. */
+.dl-release-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) 0;
+  margin-top: var(--space-5);
+  font-size: 0.875rem;
+  color: var(--text-dim);
+}
+
+.dl-release-strip span:not(.pill) + span:not(.pill)::before {
+  content: "·";
+  margin: 0 var(--space-4);
+  color: var(--text-faint);
+}
+
+.dl-release-version {
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+
+/* Two balanced option panels — low chrome, no glow, thin borders. */
+.dl-options {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
+  align-items: start;
 }
 
-@media (max-width: 760px) {
-  .dl-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.dl-card {
+.dl-panel {
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-l);
   background: var(--ink-1);
-  padding: var(--space-6);
+  padding: var(--space-5);
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
-.dl-card-head {
+/* The recommended panel earns a faint teal edge — an accent, not a glow. */
+.dl-panel.recommended {
+  border-color: var(--brand-deep);
+}
+
+.dl-panel-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
 }
 
-.dl-card-title {
-  font-size: 1.125rem;
+.dl-panel-title {
+  font-size: 1.0625rem;
+  letter-spacing: -0.01em;
 }
 
-.dl-meta {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--space-2) var(--space-5);
-  font-size: 0.875rem;
-}
-
-.dl-meta dt {
-  color: var(--text-faint);
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  align-self: center;
-}
-
-.dl-meta dd {
+.dl-panel-desc {
   margin: 0;
   color: var(--text-dim);
-  /* A published SHA-256 is 64 unbroken characters; let it wrap in the card. */
+  font-size: 0.9375rem;
+}
+
+.dl-panel-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--text-faint);
+}
+
+.dl-panel .btn {
+  align-self: flex-start;
+  margin-top: var(--space-1);
+}
+
+/* Verify disclosure: the 64-character hash appears only on request. */
+.dl-verify {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-3);
+  margin-top: var(--space-1);
+  font-size: 0.8125rem;
+}
+
+.dl-verify summary {
+  cursor: pointer;
+  color: var(--text-faint);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  transition: color 140ms var(--ease);
+}
+
+.dl-verify summary:hover {
+  color: var(--text-dim);
+}
+
+.dl-verify summary::-webkit-details-marker {
+  display: none;
+}
+
+.dl-verify summary::before {
+  content: "+";
+  font-family: var(--font-mono);
+  color: var(--brand);
+}
+
+.dl-verify[open] summary::before {
+  content: "–";
+}
+
+.dl-verify-body {
+  margin-top: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.dl-verify-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.dl-verify-hash {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+  background: var(--ink-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  padding: var(--space-2) var(--space-3);
   overflow-wrap: anywhere;
 }
 
-.dl-note {
+.dl-copy {
+  flex-shrink: 0;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: color 140ms var(--ease), border-color 140ms var(--ease);
+}
+
+.dl-copy:hover {
+  color: var(--text);
+  border-color: var(--brand);
+}
+
+.dl-verify-hint {
+  margin: 0;
+  color: var(--text-faint);
+}
+
+.dl-verify-hint code {
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.dl-fineprint {
+  margin-top: var(--space-4);
+  max-width: 72ch;
   font-size: 0.8125rem;
   color: var(--text-faint);
+}
+
+/* Three-step install guide. */
+.dl-guide {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5) var(--space-4);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dl-guide-step {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.dl-guide-num {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--brand);
+}
+
+.dl-guide-step h3 {
+  font-size: 0.9375rem;
+}
+
+.dl-guide-step p {
+  margin-top: 4px;
+  color: var(--text-dim);
+  font-size: 0.875rem;
+}
+
+@media (max-width: 760px) {
+  .dl-options,
+  .dl-guide {
+    grid-template-columns: 1fr;
+  }
+
+  .dl-panel .btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 .dl-steps {
@@ -765,47 +929,4 @@
 /* Feature bullets: neutral markers. */
 .feature-list li::before {
   background: var(--line-strong);
-}
-
-/* Download hero call to action: one primary button, one quiet secondary link,
-   plain facts in between. Deliberately flat — same language as the dl-cards. */
-.dl-hero-cta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-3);
-  margin-top: 32px;
-}
-
-.dl-hero-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 0;
-  margin: 0;
-  font-size: 0.875rem;
-  color: var(--text-dim);
-}
-
-.dl-hero-meta span + span::before {
-  content: "·";
-  margin: 0 10px;
-  color: var(--text-faint);
-}
-
-.dl-portable-link {
-  font-size: 0.9375rem;
-  color: var(--text-dim);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.dl-portable-link:hover {
-  color: var(--text);
-}
-
-.dl-smartscreen {
-  margin: 0;
-  max-width: 62ch;
-  font-size: 0.8125rem;
-  color: var(--text-faint);
 }
