@@ -55,6 +55,9 @@ export const LIMITS = {
   innerOutlineThickness: { min: 0, max: 4, step: 0.25 },
   circleRadius: { min: 0, max: 100, step: 0.5 },
   circleThickness: { min: 0.5, max: 10, step: 0.5 },
+  circleSegments: { min: 1, max: 12, step: 1 },
+  circleArcSpan: { min: 1, max: 360, step: 0.5 },
+  circleArcOffset: { min: 0, max: 360, step: 1 },
   glowBlur: { min: 0, max: 20, step: 0.5 },
   offset: { min: -200, max: 200, step: 0.5 },
   opacity: { min: 0, max: 1, step: 0.01 },
@@ -113,6 +116,17 @@ export const V2_DEFAULTS = {
   innerOutlineColor: '#000000',
   innerOutlineThickness: 1,
   innerOutlineOpacity: 1,
+} as const;
+
+/**
+ * Neutral values for every field added in schema v3 (the segmented ring).
+ * One segment spanning the full turn is exactly the pre-v3 complete circle,
+ * so normalising an old blob writes these and changes nothing on screen.
+ */
+export const V3_DEFAULTS = {
+  circleSegments: 1,
+  circleArcSpan: 360,
+  circleArcOffset: 0,
 } as const;
 
 /** A fresh per-arm map with all four directions set to `value`. */
@@ -438,6 +452,29 @@ export function normalizeCrosshairConfig(raw: unknown, context = 'crosshair'): N
       LIMITS.opacity,
       repairs,
       `${context}.circleOpacity`,
+    ),
+
+    // v3 — segmented ring. Neutral defaults reproduce the complete circle.
+    circleSegments: num(
+      raw.circleSegments,
+      V3_DEFAULTS.circleSegments,
+      LIMITS.circleSegments,
+      repairs,
+      `${context}.circleSegments`,
+    ),
+    circleArcSpan: num(
+      raw.circleArcSpan,
+      V3_DEFAULTS.circleArcSpan,
+      LIMITS.circleArcSpan,
+      repairs,
+      `${context}.circleArcSpan`,
+    ),
+    circleArcOffset: num(
+      raw.circleArcOffset,
+      V3_DEFAULTS.circleArcOffset,
+      LIMITS.circleArcOffset,
+      repairs,
+      `${context}.circleArcOffset`,
     ),
 
     glowEnabled: bool(raw.glowEnabled, false, repairs, `${context}.glowEnabled`),

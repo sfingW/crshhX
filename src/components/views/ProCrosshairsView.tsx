@@ -154,7 +154,8 @@ export const ProCrosshairsView: React.FC<ProCrosshairsViewProps> = ({
             Pro Crosshairs
           </h2>
           <p className="text-zinc-400 text-xs max-w-2xl">
-            {PRO_CROSSHAIR_ENTRIES.length} curated designs, researched from competitive play.
+            {PRO_CROSSHAIR_ENTRIES.length} curated designs. The standard sheet is researched from
+            competitive play; Gold Series entries are labelled fan recreations.
             Every preview is drawn by the real overlay renderer, and every design is yours to
             tweak after applying.
           </p>
@@ -262,9 +263,17 @@ export const ProCrosshairsView: React.FC<ProCrosshairsViewProps> = ({
                               In use
                             </span>
                           )}
+                          {entry.meta.series === 'gold' && (
+                            <span className="px-1 py-0.5 rounded text-[8px] font-mono uppercase text-[#d8b25c] border border-[#8a6f35]">
+                              Gold
+                            </span>
+                          )}
                         </div>
                         <TierBadge tier={entry.meta.tier} />
                         <p className="text-[11px] text-zinc-400 leading-snug">{entry.meta.description}</p>
+                        {entry.meta.inspiration && (
+                          <p className="text-[10px] text-zinc-500 leading-snug">{entry.meta.inspiration}</p>
+                        )}
                       </div>
                       <button
                         onClick={() => onToggleFavourite(entry.config.id)}

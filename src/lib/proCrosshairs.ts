@@ -29,7 +29,8 @@ export type ProCategoryId =
   | 'classic'
   | 'dot'
   | 'circle'
-  | 'custom';
+  | 'custom'
+  | 'gold';
 
 export interface ProCrosshairMeta {
   id: string;
@@ -41,6 +42,17 @@ export interface ProCrosshairMeta {
   sourceNote?: string;
   /** Required for tier 'verified': when the source was checked (YYYY-MM-DD). */
   checkedOn?: string;
+  /**
+   * Gold Series: the design gets the premium presentation on the website and
+   * sits outside the standard sheet. Requires `inspiration`.
+   */
+  series?: 'gold';
+  /**
+   * Attribution for fan recreations: what the design was recreated from, and
+   * an explicit statement that it is not official. Required when `series`
+   * is set; a data test enforces it.
+   */
+  inspiration?: string;
 }
 
 export const PRO_CROSSHAIR_CATEGORIES: Array<{
@@ -56,6 +68,11 @@ export const PRO_CROSSHAIR_CATEGORIES: Array<{
   { id: 'dot', label: 'Dot', blurb: 'One point, zero clutter.' },
   { id: 'circle', label: 'Circle', blurb: 'Rings for spread and tracking.' },
   { id: 'custom', label: 'Custom designs', blurb: 'crshhx originals using the full v2 engine.' },
+  {
+    id: 'gold',
+    label: 'Gold Series',
+    blurb: 'Two fan recreations in a premium presentation, apart from the standard sheet.',
+  },
 ];
 
 export const TIER_LABELS: Record<ProTier, string> = {
@@ -132,6 +149,8 @@ interface ProDef {
   category: ProCategoryId;
   tier: ProTier;
   description: string;
+  series?: 'gold';
+  inspiration?: string;
 }
 
 const DEFS: ProDef[] = [
@@ -465,6 +484,42 @@ const DEFS: ProDef[] = [
     category: 'custom', tier: 'original',
     description: 'Grows when you fire and shrinks back. Trains you to pace your shots.',
   },
+
+  /* ---------------- Gold Series ----------------
+   *
+   * A deliberate, narrow exception to the "no player names" rule above, and
+   * the difference is in what is claimed: the vault never says what a named
+   * player uses, and these two do not either. They say they are fan
+   * recreations drawn from public reference imagery — measured geometry, not
+   * published settings — and every surface that shows them repeats that they
+   * are not official and imply no endorsement.
+   */
+  {
+    config: pc('pc-gold-arc-crown', 'Arc Crown', 'universal', {
+      topology: 'circle',
+      hasTopArm: false, hasBottomArm: false, hasLeftArm: false, hasRightArm: false,
+      circleEnabled: true, circleRadius: 28, circleThickness: 4,
+      circleColor: '#dc583e', circleOpacity: 1,
+      circleSegments: 4, circleArcSpan: 40, circleArcOffset: 45,
+      centerDotEnabled: true, centerDotSize: 7, centerDotShape: 'circle',
+      centerDotColor: '#28f953',
+    }),
+    category: 'gold', tier: 'inspired', series: 'gold',
+    inspiration:
+      "Fan recreation from public reference imagery of MrSavage's crosshair. Not an official preset; no endorsement implied.",
+    description:
+      'Four vermilion arcs crowning a bright green point. The open cardinals keep the centre of the screen clean for tracking.',
+  },
+  {
+    config: pc('pc-gold-compact-mark', 'Compact Mark', 'universal', {
+      primaryColor: '#6af469', length: 12, thickness: 4, gap: 5,
+    }),
+    category: 'gold', tier: 'inspired', series: 'gold',
+    inspiration:
+      "Fan recreation from public reference imagery of MrSavage's crosshair. Not an official preset; no endorsement implied.",
+    description:
+      'A compact green cross with a hollow centre: the four inner edges form the aiming point. No outline, no dot.',
+  },
 ];
 
 /** Every Pro Crosshair config, ready for `getPresetIndex` and the overlay. */
@@ -482,6 +537,7 @@ export const PRO_CROSSHAIR_META: Record<string, ProCrosshairMeta> = Object.fromE
       ...(d.tier === 'verified'
         ? { sourceNote: 'see docs/research/pro-crosshairs.md', checkedOn: '2026-11-07' }
         : {}),
+      ...(d.series ? { series: d.series, inspiration: d.inspiration } : {}),
     } satisfies ProCrosshairMeta,
   ]),
 );

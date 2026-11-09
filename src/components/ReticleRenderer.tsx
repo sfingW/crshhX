@@ -2,11 +2,57 @@ import React from 'react';
 import type { ArmDirection, CrosshairConfig } from '../types/crosshair';
 import {
   V2_DEFAULTS,
+  V3_DEFAULTS,
   effectiveRotation,
   effectiveScale,
   resolveArmGeometry,
   stretchRatioX,
 } from '../lib/crosshairSchema';
+
+/**
+ * SVG path for one circular arc: radius `r` about (`cx`,`cy`), from `startDeg`
+ * to `endDeg`, degrees counter-clockwise with 0 at east. Screen y grows
+ * downwards, so the sine is negated; the sweep flag follows, which is what
+ * makes the arc take the short way round in the direction of increasing
+ * angle. Ends are exact: callers set `strokeLinecap="butt"`.
+ */
+export function arcPath(
+  cx: number,
+  cy: number,
+  r: number,
+  startDeg: number,
+  endDeg: number,
+): string {
+  const a0 = (startDeg * Math.PI) / 180;
+  const a1 = (endDeg * Math.PI) / 180;
+  const x0 = cx + r * Math.cos(a0);
+  const y0 = cy - r * Math.sin(a0);
+  const x1 = cx + r * Math.cos(a1);
+  const y1 = cy - r * Math.sin(a1);
+  const largeArc = endDeg - startDeg > 180 ? 1 : 0;
+  const round = (n: number) => Number(n.toFixed(3));
+  return `M ${round(x0)} ${round(y0)} A ${round(r)} ${round(r)} 0 ${largeArc} 0 ${round(x1)} ${round(y1)}`;
+}
+
+/**
+ * Segment boundaries of the ring, as [start,end] degree pairs. One span of a
+ * full turn means the historical complete circle; anything else is a segmented
+ * ring of N arcs spaced 360/N apart, turned by `circleArcOffset` plus the
+ * reticle's rotation (a segmented ring is not rotation-invariant).
+ */
+export function ringArcs(
+  config: Pick<CrosshairConfig, 'circleSegments' | 'circleArcSpan' | 'circleArcOffset'>,
+  rotationDeg = 0,
+): Array<[number, number]> {
+  const segments = config.circleSegments ?? V3_DEFAULTS.circleSegments;
+  const span = config.circleArcSpan ?? V3_DEFAULTS.circleArcSpan;
+  if (segments <= 1 || span >= 360) return [[0, 360]];
+  const offset = (config.circleArcOffset ?? V3_DEFAULTS.circleArcOffset) + rotationDeg;
+  return Array.from({ length: segments }, (_, i) => {
+    const centre = offset + (i * 360) / segments;
+    return [centre - span / 2, centre + span / 2] as [number, number];
+  });
+}
 
 interface ReticleRendererProps {
   config: CrosshairConfig;
@@ -255,42 +301,94 @@ export const ReticleRenderer: React.FC<ReticleRendererProps> = ({
         </defs>
 
         <g filter={config.glowEnabled ? `url(#${glowFilterId})` : undefined}>
-          {/* SPREAD CIRCLE / SHOTGUN RING — rotation-invariant, drawn unrotated */}
-          {config.circleEnabled && (
-            <g>
-              {outlineThick > 0 && (
-                <circle
-                  cx={center}
-                  cy={center}
-                  r={config.circleRadius}
-                  fill="none"
-                  stroke={config.outlineColor}
-                  strokeWidth={config.circleThickness + outlineThick * 2}
-                  strokeOpacity={config.outlineOpacity}
-                />
-              )}
-              <circle
-                cx={center}
-                cy={center}
-                r={config.circleRadius}
-                fill="none"
-                stroke={config.circleColor}
-                strokeWidth={config.circleThickness}
-                strokeOpacity={config.circleOpacity}
-              />
-              {innerThick > 0 && config.circleRadius * 2 - innerThick > 0 && (
-                <circle
-                  cx={center}
-                  cy={center}
-                  r={Math.max(0, config.circleRadius - (config.circleThickness + innerThick) / 2)}
-                  fill="none"
-                  stroke={config.innerOutlineColor}
-                  strokeWidth={innerThick}
-                  strokeOpacity={config.innerOutlineOpacity}
-                />
-              )}
-            </g>
-          )}
+        {/* SPREAD CIRCLE / SHOTGUN RING — a complete circle is rotation-invariant
+            and drawn unrotated; a segmented ring turns with `rotation` */}
+        {config.circleEnabled &&
+          (() => {
+            const arcs = ringArcs(config, rotation);
+            const isFullCircle = arcs.length === 1 && arcs[0][1] - arcs[0][0] >= 360;
+            const innerRadius = Math.max(
+              0,
+              config.circleRadius - (config.circleThickness + innerThick) / 2,
+            );
+            const showInner = innerThick > 0 && config.circleRadius * 2 - innerThick > 0;
+            if (isFullCircle) {
+              return (
+                <g>
+                  {outlineThick > 0 && (
+                    <circle
+                      cx={center}
+                      cy={center}
+                      r={config.circleRadius}
+                      fill="none"
+                      stroke={config.outlineColor}
+                      strokeWidth={config.circleThickness + outlineThick * 2}
+                      strokeOpacity={config.outlineOpacity}
+                    />
+                  )}
+                  <circle
+                    cx={center}
+                    cy={center}
+                    r={config.circleRadius}
+                    fill="none"
+                    stroke={config.circleColor}
+                    strokeWidth={config.circleThickness}
+                    strokeOpacity={config.circleOpacity}
+                  />
+                  {showInner && (
+                    <circle
+                      cx={center}
+                      cy={center}
+                      r={innerRadius}
+                      fill="none"
+                      stroke={config.innerOutlineColor}
+                      strokeWidth={innerThick}
+                      strokeOpacity={config.innerOutlineOpacity}
+                    />
+                  )}
+                </g>
+              );
+            }
+            return (
+              <g>
+                {outlineThick > 0 &&
+                  arcs.map(([start, end], i) => (
+                    <path
+                      key={`ring-outline-${i}`}
+                      d={arcPath(center, center, config.circleRadius, start, end)}
+                      fill="none"
+                      stroke={config.outlineColor}
+                      strokeWidth={config.circleThickness + outlineThick * 2}
+                      strokeOpacity={config.outlineOpacity}
+                      strokeLinecap="butt"
+                    />
+                  ))}
+                {arcs.map(([start, end], i) => (
+                  <path
+                    key={`ring-${i}`}
+                    d={arcPath(center, center, config.circleRadius, start, end)}
+                    fill="none"
+                    stroke={config.circleColor}
+                    strokeWidth={config.circleThickness}
+                    strokeOpacity={config.circleOpacity}
+                    strokeLinecap="butt"
+                  />
+                ))}
+                {showInner &&
+                  arcs.map(([start, end], i) => (
+                    <path
+                      key={`ring-inner-${i}`}
+                      d={arcPath(center, center, innerRadius, start, end)}
+                      fill="none"
+                      stroke={config.innerOutlineColor}
+                      strokeWidth={innerThick}
+                      strokeOpacity={config.innerOutlineOpacity}
+                      strokeLinecap="butt"
+                    />
+                  ))}
+              </g>
+            );
+          })()}
 
           {/* Rotating group: arms, chevron and the centre dot turn together. */}
           <g transform={rotation !== 0 ? `rotate(${rotation} ${center} ${center})` : undefined}>

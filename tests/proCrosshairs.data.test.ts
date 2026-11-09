@@ -31,7 +31,7 @@ const ALL_IDS = [
 
 describe('catalogue shape', () => {
   it('covers every required category with entries', () => {
-    const required = ['fortnite', 'tactical', 'minimal', 'precision', 'classic', 'dot', 'circle', 'custom'];
+    const required = ['fortnite', 'tactical', 'minimal', 'precision', 'classic', 'dot', 'circle', 'custom', 'gold'];
     expect(PRO_CROSSHAIR_CATEGORIES.map((c) => c.id).sort()).toEqual([...required].sort());
     for (const category of required) {
       const count = PRO_CROSSHAIR_ENTRIES.filter((e) => e.meta.category === category).length;
@@ -39,8 +39,8 @@ describe('catalogue shape', () => {
     }
   });
 
-  it('ships 40 designs and keeps entries and configs in lockstep', () => {
-    expect(PRO_CROSSHAIRS.length).toBe(40);
+  it('ships 42 designs and keeps entries and configs in lockstep', () => {
+    expect(PRO_CROSSHAIRS.length).toBe(42);
     expect(PRO_CROSSHAIR_ENTRIES.length).toBe(PRO_CROSSHAIRS.length);
     expect(PRO_CROSSHAIR_ENTRIES.map((e) => e.config.id)).toEqual(PRO_CROSSHAIRS.map((c) => c.id));
     for (const entry of PRO_CROSSHAIR_ENTRIES) {
