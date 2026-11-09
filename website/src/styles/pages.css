@@ -1152,3 +1152,184 @@
 .doc-related a:hover {
   color: var(--accent-here);
 }
+
+/* ------------------------------------------------------------------ *
+ * Gold Series — two fan recreations, presented apart from the sheet.
+ *
+ * Restraint is the brief: metallic gold type and hairlines on a dark
+ * plate, one shimmer pass on hover or open, no glow, no gradients on
+ * type, nothing spinning. Every motion is transform/opacity/grid-rows
+ * only, and all of it stands down for reduced motion.
+ * ------------------------------------------------------------------ */
+
+.gold-band {
+  border-block: 1px solid var(--gold-line);
+}
+
+.gold-num {
+  color: var(--gold);
+}
+
+.gold-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-5);
+  max-width: 880px;
+}
+
+.gold-card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--gold-plate);
+  border: 1px solid var(--gold-line);
+  border-radius: 8px;
+  transition:
+    border-color 0.18s var(--ease),
+    transform 0.18s var(--ease);
+}
+
+.gold-card:hover {
+  border-color: var(--gold);
+  transform: translateY(-1px);
+}
+
+.gold-card.is-open {
+  border-color: var(--gold);
+}
+
+/* One shimmer pass, on hover or open only — never idle, never looping. */
+.gold-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 42%,
+    rgb(216 178 92 / 0.1) 50%,
+    transparent 58%
+  );
+  transform: translateX(-120%);
+}
+
+.gold-card:hover::after,
+.gold-card.is-open::after {
+  animation: gold-shimmer 0.6s var(--ease) 1;
+}
+
+@keyframes gold-shimmer {
+  to {
+    transform: translateX(120%);
+  }
+}
+
+/* The reticle keeps the product's own sunken surface, not a gold one: the
+   honesty rule — product visuals sit on field plates. */
+.gold-stage {
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+  background: var(--field-2);
+  border: 1px solid var(--gold-line);
+  border-radius: 4px;
+}
+
+.gold-label {
+  width: max-content;
+  padding: 2px 8px;
+  border: 1px solid var(--gold-line);
+  border-radius: 4px;
+  color: var(--gold);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.gold-name {
+  margin: 0;
+  color: var(--gold-bright);
+  font-family: var(--font-display);
+  font-size: var(--title-1);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.gold-desc {
+  margin: 0;
+  color: var(--on-field-2);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.gold-toggle {
+  width: max-content;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--gold);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: color 0.18s var(--ease);
+}
+
+.gold-toggle:hover {
+  color: var(--gold-bright);
+}
+
+/* Open/close reveal: rows collapse, so height animates without JS. */
+.gold-more {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.22s var(--ease);
+}
+
+.gold-more-inner {
+  overflow: hidden;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.gold-card.is-open .gold-more {
+  grid-template-rows: 1fr;
+}
+
+.gold-inspiration {
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--gold-line);
+  color: var(--on-field-3);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.gold-facts {
+  margin: 0;
+  display: flex;
+  gap: var(--space-3);
+  color: var(--on-field-3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gold-card,
+  .gold-toggle,
+  .gold-more {
+    transition: none;
+  }
+  .gold-card:hover {
+    transform: none;
+  }
+  .gold-card:hover::after,
+  .gold-card.is-open::after {
+    animation: none;
+  }
+}

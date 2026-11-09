@@ -29,6 +29,15 @@ export interface ProEntry {
   topology: string;
   game: string;
   /**
+   * Gold Series: premium presentation, shown apart from the standard sheet.
+   */
+  series?: 'gold';
+  /**
+   * Attribution for fan recreations: what the design was recreated from, and
+   * that it is not official. Rendered wherever the design is shown.
+   */
+  inspiration?: string;
+  /**
    * Effects the design uses that a static drawing cannot show — glow, firing
    * bloom, ADS morphing, stretched compensation, position offset. Absent when
    * the drawing is the whole design. Pages state these in words so a rendered

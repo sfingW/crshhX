@@ -24,7 +24,7 @@
     }
   },
   "pro": {
-    "total": 40,
+    "total": 42,
     "note": "No player-named crosshairs yet — and that is deliberate. Public setting sites disagree about what famous players actually use, so we only list a crosshair as verified when the player has published it themselves. Everything else here is labelled as inspired or original.",
     "tierLabels": {
       "verified": "Verified player",
@@ -71,6 +71,11 @@
         "id": "custom",
         "label": "Custom designs",
         "blurb": "crshhx originals using the full v2 engine."
+      },
+      {
+        "id": "gold",
+        "label": "Gold Series",
+        "blurb": "Two fan recreations in a premium presentation, apart from the standard sheet."
       }
     ],
     "entries": [
@@ -785,6 +790,56 @@
           "length": 4,
           "thickness": 2,
           "gap": 2
+        }
+      },
+      {
+        "id": "pc-gold-arc-crown",
+        "name": "Arc Crown",
+        "category": "gold",
+        "tier": "inspired",
+        "description": "Four vermilion arcs crowning a bright green point. The open cardinals keep the centre of the screen clean for tracking.",
+        "topology": "circle",
+        "game": "universal",
+        "series": "gold",
+        "inspiration": "Fan recreation from public reference imagery of MrSavage's crosshair. Not an official preset; no endorsement implied.",
+        "spec": {
+          "color": "#00ffcc",
+          "length": 4,
+          "thickness": 2,
+          "gap": 2,
+          "arms": {
+            "top": false,
+            "bottom": false,
+            "left": false,
+            "right": false
+          },
+          "dot": true,
+          "dotSize": 7,
+          "dotColor": "#28f953",
+          "ring": true,
+          "ringRadius": 28,
+          "ringThickness": 4,
+          "ringColor": "#dc583e",
+          "ringSegments": 4,
+          "ringArcSpan": 40,
+          "ringArcOffset": 45
+        }
+      },
+      {
+        "id": "pc-gold-compact-mark",
+        "name": "Compact Mark",
+        "category": "gold",
+        "tier": "inspired",
+        "description": "A compact green cross with a hollow centre: the four inner edges form the aiming point. No outline, no dot.",
+        "topology": "cross",
+        "game": "universal",
+        "series": "gold",
+        "inspiration": "Fan recreation from public reference imagery of MrSavage's crosshair. Not an official preset; no endorsement implied.",
+        "spec": {
+          "color": "#6af469",
+          "length": 12,
+          "thickness": 4,
+          "gap": 5
         }
       }
     ]

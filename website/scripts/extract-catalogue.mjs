@@ -152,6 +152,13 @@ function toSpec(config) {
     spec.ringThickness = config.circleThickness;
     if (config.circleColor !== config.primaryColor) spec.ringColor = config.circleColor;
     if (config.circleOpacity !== 1) spec.ringOpacity = config.circleOpacity;
+    // v3 — a segmented ring is a static shape, so the preview draws it; only
+    // written when the design actually segments, keeping old entries byte-identical.
+    if ((config.circleSegments ?? 1) > 1) {
+      spec.ringSegments = config.circleSegments;
+      spec.ringArcSpan = config.circleArcSpan;
+      spec.ringArcOffset = config.circleArcOffset;
+    }
   }
   /** Effects a static drawing cannot show. Recorded, never silently dropped. */
   const beyond = [];
@@ -176,6 +183,8 @@ async function proFacts() {
       description: entry.meta.description,
       topology,
       game,
+      ...(entry.meta.series ? { series: entry.meta.series } : {}),
+      ...(entry.meta.inspiration ? { inspiration: entry.meta.inspiration } : {}),
       ...(beyond.length > 0 ? { beyond } : {}),
       spec,
     };

@@ -152,11 +152,15 @@ describe('interactive surfaces', () => {
     const { container } = await hydrate('/pro-crosshairs');
     const items = () => container.querySelectorAll('.sheet-item').length;
 
-    // All forty designs are in the prerendered document before any script runs.
-    expect(items()).toBe(CATALOGUE.pro.total);
+    // All forty sheet designs are in the prerendered document before any
+    // script runs; the two Gold Series cards sit outside the sheet.
+    const sheet = CATALOGUE.pro.entries.filter((entry) => entry.series !== 'gold');
+    expect(items()).toBe(sheet.length);
 
     const buttons = [...container.querySelectorAll<HTMLButtonElement>('.cat-tab')];
-    expect(buttons).toHaveLength(CATALOGUE.pro.categories.length + 1);
+    expect(buttons).toHaveLength(
+      CATALOGUE.pro.categories.filter((category) => category.id !== 'gold').length + 1,
+    );
 
     const precision = buttons.find((button) => button.textContent?.startsWith('Precision'));
     expect(precision).toBeTruthy();
@@ -178,7 +182,7 @@ describe('interactive surfaces', () => {
     await act(async () => {
       buttons[0]?.click();
     });
-    expect(items()).toBe(CATALOGUE.pro.total);
+    expect(items()).toBe(sheet.length);
     expect(container.querySelector('.cat-blurb')).toBeNull();
     expect(problems).toEqual([]);
   });

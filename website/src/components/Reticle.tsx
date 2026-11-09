@@ -44,6 +44,10 @@ export interface ReticleSpec {
   ringThickness?: number;
   ringColor?: string;
   ringOpacity?: number;
+  /** v3 segmented ring, mirroring the application renderer exactly. */
+  ringSegments?: number;
+  ringArcSpan?: number;
+  ringArcOffset?: number;
   /** Degrees clockwise. */
   rotation?: number;
   scale?: number;
@@ -55,6 +59,35 @@ const C = VIEW / 2;
 /** Overlay pixels → SVG units, so proportions match the product. */
 const PX = 3.1;
 const DIRS: readonly ArmDirection[] = ['top', 'right', 'bottom', 'left'];
+
+/**
+ * One circular arc as an SVG path, degrees counter-clockwise from east with
+ * the sine negated for screen coordinates — the same convention as the
+ * application's `arcPath`, so a segmented ring previews pixel-for-pixel.
+ */
+function arcD(cx: number, cy: number, r: number, startDeg: number, endDeg: number): string {
+  const a0 = (startDeg * Math.PI) / 180;
+  const a1 = (endDeg * Math.PI) / 180;
+  const round = (n: number) => Number(n.toFixed(3));
+  const large = endDeg - startDeg > 180 ? 1 : 0;
+  return (
+    `M ${round(cx + r * Math.cos(a0))} ${round(cy - r * Math.sin(a0))} ` +
+    `A ${round(r)} ${round(r)} 0 ${large} 0 ` +
+    `${round(cx + r * Math.cos(a1))} ${round(cy - r * Math.sin(a1))}`
+  );
+}
+
+/** Segment boundaries of a segmented ring; one full span = a complete circle. */
+function ringArcBounds(spec: ReticleSpec): Array<[number, number]> {
+  const segments = spec.ringSegments ?? 1;
+  const span = spec.ringArcSpan ?? 360;
+  if (segments <= 1 || span >= 360) return [[0, 360]];
+  const offset = spec.ringArcOffset ?? 0;
+  return Array.from({ length: segments }, (_, i) => {
+    const centre = offset + (i * 360) / segments;
+    return [centre - span / 2, centre + span / 2] as [number, number];
+  });
+}
 
 interface ArmBox {
   x: number;
@@ -173,15 +206,38 @@ export function Reticle({
         transform={`rotate(${rotation} ${C} ${C}) translate(${C} ${C}) scale(${scale}) translate(${-C} ${-C})`}
       >
         {spec.ring ? (
-          <circle
-            cx={C}
-            cy={C}
-            r={(spec.ringRadius ?? 18) * PX}
-            fill="none"
-            stroke={spec.ringColor ?? spec.color}
-            strokeWidth={(spec.ringThickness ?? 1.5) * PX}
-            opacity={spec.ringOpacity ?? 1}
-          />
+          (() => {
+            const bounds = ringArcBounds(spec);
+            const radius = (spec.ringRadius ?? 18) * PX;
+            const stroke = spec.ringColor ?? spec.color;
+            const width = (spec.ringThickness ?? 1.5) * PX;
+            const opacity = spec.ringOpacity ?? 1;
+            const full = bounds.length === 1 && bounds[0][1] - bounds[0][0] >= 360;
+            if (full) {
+              return (
+                <circle
+                  cx={C}
+                  cy={C}
+                  r={radius}
+                  fill="none"
+                  stroke={stroke}
+                  strokeWidth={width}
+                  opacity={opacity}
+                />
+              );
+            }
+            return (
+              <g fill="none" stroke={stroke} strokeWidth={width} opacity={opacity}>
+                {bounds.map(([start, end], i) => (
+                  <path
+                    key={i}
+                    d={arcD(C, C, radius, start, end)}
+                    strokeLinecap="butt"
+                  />
+                ))}
+              </g>
+            );
+          })()
         ) : null}
 
         {/* Outer outline: the same shapes, grown, drawn behind. */}

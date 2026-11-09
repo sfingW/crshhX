@@ -60,6 +60,15 @@
    * call to action, an active control and one or two data points per screen —
    * never as a band, a gradient or a glow. */
   --accent: #00e599; /* on the field: 11.80 / 10.93 / 9.85 */
+
+  /* Gold Series — premium presentation for the two fan recreations.
+     Text pairs are asserted by the build gate against --gold-plate:
+     --gold 9.39, --gold-bright 12.16, --on-field-3 5.59. --gold-line is a
+     hairline at 3.96 on the plate: borders and rules only, never text. */
+  --gold: #d8b25c;
+  --gold-bright: #e8cd8a;
+  --gold-line: #8a6f35;
+  --gold-plate: #101114;
   --accent-bright: #4cf0bc; /* hover */
   --accent-deep: #0a6b4c; /* in the studio: 5.92 / 5.41 / 6.49 */
   --on-accent: #06231c; /* 10.01 against --accent */

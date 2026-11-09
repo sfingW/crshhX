@@ -403,7 +403,7 @@ export function DocsPage() {
 
             <div className="doc-related">
               <h2 className="doc-related-title">Elsewhere on this site</h2>
-              <Link to="/pro-crosshairs">Pro Crosshairs — the 40 curated designs</Link>
+              <Link to="/pro-crosshairs">Pro Crosshairs — the 42 curated designs</Link>
               <Link to="/academy">Crosshair Academy — the 10 tutorials</Link>
               <Link to="/features">Features — every area, with rendered visuals</Link>
               <Link to="/changelog">Changelog — what each release changed</Link>

@@ -108,7 +108,7 @@ describe('route table', () => {
   it('describes the two catalogue pages with counts that come from the product', () => {
     // The titles carry the real numbers, so a search result states what is
     // actually installed rather than a marketing adjective.
-    expect(routeFor('/pro-crosshairs')?.title).toContain('40');
+    expect(routeFor('/pro-crosshairs')?.title).toContain('42');
     expect(routeFor('/academy')?.title).toContain('tutorials');
     expect(routeFor('/changelog')?.description).not.toContain('Nothing has been published');
   });
