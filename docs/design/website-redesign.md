@@ -376,23 +376,23 @@ actually used by the product and the site (`#35e0ff`, `#2be08a`, `#f2f5f6`, `#ff
 | `#3d4249` mid field | 3.35 | all visible |
 | `#44474d` lightest viable field | 3.08 | all visible — the ceiling |
 
-**A light-themed crshhx site cannot honestly show the product.** That is a functional
-finding, not a preference.
+**Correction to an earlier claim in this document.** This section originally concluded that
+"a light-themed crshhx site cannot honestly show the product", and rejected a mixed
+light-page/dark-stage approach on that basis. **That conclusion was overstated and is
+withdrawn.** The measurement is sound but narrower than the claim drawn from it: what fails
+at 3:1 is a light **field** — the surface a reticle is drawn on. A light **page** that places
+its product surfaces on dark plates is entirely viable, because the reticle never sits on
+paper. Directions B and C in §15 are both built that way, and they work.
 
-Three options were weighed:
+What the measurement does establish, and what still holds:
 
-- **Light with dark product stages (mixed).** Technically viable — reticles live inside dark
-  insets, so they stay legible. Rejected: it makes the product look like a screenshot pasted
-  onto a brochure, contradicts the application (which is dark), and pushes every reticle into
-  a box rather than letting it occupy the page.
-- **Mixed by page** (dark marketing, light documentation). Considered seriously, because
-  long-form reading is more comfortable on light paper. Rejected for coherence: the
-  documentation also illustrates crosshair parameters with rendered reticles, so it inherits
-  the same legibility constraint; and a theme change mid-site would read as two products.
-  Long-form comfort is instead bought with measure, leading and surface lift (§8).
-- **Dark-first throughout. Chosen.** Not black: a warm-neutral ramp lifted from the
-  application itself, with product stages on a slightly raised field so all six reticle
-  colours clear 3:1 with margin.
+- The surface a crosshair is drawn on must stay dark. `#44474d` is the lightest field on
+  which all six shipped colours still clear 3:1, so there is a hard ceiling.
+- Consequently a fully light site is impossible without boxing every product visual, and
+  hierarchy on any light surface must be carried by typography and spacing rather than by
+  showing the product large and free.
+- Dark-first remains the *lowest-risk* answer, but it is no longer the only defensible one,
+  and "the product is dark so the site must be dark" is not by itself a sufficient argument.
 
 **Corollary that shapes the whole identity:** because the field must stay dark enough for a
 white crosshair, the *page* can never be light — so contrast and hierarchy must come from
@@ -818,3 +818,422 @@ normal pull-request workflow, checks green before any merge request.
 - **D4 — Preset count. RESOLVED, no decision needed.** Verified by execution as exactly
   **258** (§5.8); the website's existing figure is correct. The remaining action is a test
   pinning the published figure to the generated vault length, so it cannot silently drift.
+
+---
+
+## 14. Visual inspection: what was verified and what was not
+
+This section exists because the distinction is load-bearing, and because an earlier pass of
+this work blurred it.
+
+**`fetch_page` returns rendered Markdown. It returns no CSS, no computed styles, no images
+and no layout.** Everything recorded in §1–§3 about linear.app, raycast.com and framer.com is
+therefore about *content, information architecture, copy and hierarchy* — and those findings
+are real: section order, headline wording, figure numbering, CTA placement, the `v2.11.1.0 |
+Windows 10+ | Install via WinGet` microcopy line, Raycast's metric-led four-up row, Linear's
+Fig-numbered editorial device, Framer's layered application chrome, the shape of Linear's
+`/download`.
+
+**Nothing numeric about those sites is measured.** Their font stacks, sizes, hex values,
+spacing and easing curves were never observable, and any such figure in this document is a
+proposal for crshhx, not a reading of them. Their stylesheet URLs and images are unreachable
+from this environment.
+
+**Browser automation was attempted and is not available.** No browser binary is installed
+(Chrome, Chromium, Firefox, WebKit and `headless_shell` are all absent) and no Playwright or
+Puppeteer cache exists. `playwright-core@1.65.0` and `playwright@1.65.0` install from npm
+successfully, but `npx playwright install chromium` fails with `ECONNRESET` on
+`cdn.playwright.dev` while fetching Chrome for Testing 158.0.8127.18. A direct `fetch` probe
+confirms the cause: only `registry.npmjs.org` responds; `cdn.playwright.dev`,
+`storage.googleapis.com`, `unpkg.com`, `cdnjs.cloudflare.com`, `cdn.jsdelivr.net`,
+`fonts.googleapis.com`, `linear.app` and `www.raycast.com` all fail with `ECONNRESET`, and
+`github.com` over node `fetch` fails certificate verification. Bash egress is effectively
+npm-only; `fetch_page` runs elsewhere and does reach the general web.
+
+**Consequence, stated plainly: I have not visually inspected any website, including
+crshhx.com in production, and I cannot render anything to an image to inspect it myself.**
+No screenshot in this project was produced by me. Where this document describes how the
+current site *looks*, that is inferred from reading 2,065 lines of its CSS and its component
+markup — which is how the type-hierarchy, uniform-surface and CSS-drift findings in §7 were
+obtained, and which is reliable for those structural claims but is not a substitute for
+seeing the page.
+
+**The method adopted instead: build the directions as real pages and have a human look at
+them.** `docs/design/concepts/` contains four self-contained HTML documents — an index and
+one per direction — written in plain HTML and CSS, served locally so they can be opened,
+scrolled and resized in an actual browser. Visual judgement is thereby delegated to someone
+who can actually see. The concepts deliberately load their display faces from Google Fonts so
+each direction can be judged with the typeface it intends; **that link must never ship**,
+because production self-hosts woff2 subsets and `verify-dist.mjs` fails the build on any
+non-first-party origin. They live outside `website/src` so they are never compiled, bundled or
+published.
+
+Resources that were **not** inspected, and are not claimed: collectui, httpster,
+hoverstat.es, mkdir.directory, awesome-design-systems, uiverse.io, uidesigndaily,
+open-ui.org, lapa.ninja, html5up, themewagon, templatemo, codemyui, fomantic-ui, beercss,
+cssbed, layoutit, picsum, dummyimage, blurha.sh, visiwig, formito's favicon generator,
+icon-shelf, scrollbar.app, naker, lottiefiles' creator, http.cat, vite.dev,
+storybook.js.org, html5boilerplate, and everything beyond the first chunk of
+awesome-web-animation. The reason is context budget and the images-only limitation of
+`fetch_page` — **not** that these sites blocked access. Dribbble and Awwwards were reached but
+yield only alt-text, so their visuals could not be studied; both are recorded as low-relevance
+for that reason rather than for their content.
+
+---
+
+## 15. Three genuinely different visual directions
+
+All three were built as working pages (`docs/design/concepts/`), each with real crshhx copy
+and real product data. Each attacks a different axis: **A** changes the surface treatment and
+scale; **B** changes the light/dark balance and the typographic identity; **C** changes the
+structural concept. They are not three colourways of one idea.
+
+### Direction A — "Aperture": immersive dark, product-lit
+
+**The idea.** One dark room, one lit subject. Rather than a page decorated with product
+screenshots, the page *is* the environment the overlay draws into, and the reticle is the
+only bright thing on it.
+
+**Treatment.** Background `#08090B`, a single raised surface `#0E1013`, field `#12141A`,
+hairlines `#1E2128`. Display face Inter Tight at 600, `clamp(46px,6.4vw,92px)`, line-height
+0.96, tracking −0.045em, with a deliberately dimmed third line — the first typographic move
+the current site lacks. Accent `#00E599`, used maybe six times on the page.
+
+**Composition.** An asymmetric 7/5 hero — headline on one side, a large square stage holding
+a 240px reticle with a monospace parameter readout on the other, the stage aligned to the
+headline's second line rather than centred. Then a **specification rail**: four facts in a
+borderless row separated by space alone, no cards, no dividers — the specific antidote to the
+current site's uniform bordered boxes. Then two capability sections that alternate side by
+side rather than repeating a layout. Then a raised download strip and a minimal footer.
+
+**What it is good at.** It is the closest of the three to the Linear/Raycast register, every
+reticle colour is comfortably legible, and it is by far the cheapest to build from the code
+that already exists. It reads as a serious tool rather than a game mod.
+
+**What it risks.** It is the nearest neighbour to the "generic dark developer-documentation"
+look the brief objects to. It is the least distinctive of the three, and because it has no
+strong structural idea of its own, it depends entirely on typographic discipline and
+composition to avoid flatness — exactly the failure mode documented in §7.
+
+### Direction B — "Paper & Precision": light editorial with dark plates
+
+**The idea.** A technical monograph about an instrument. Confident, spare, printed — the
+opposite of a gaming site, and a deliberate test of the brief's instruction to explore a
+different light/dark balance instead of assuming dark.
+
+**Treatment.** Warm paper `#F6F5F1`, ink `#15161A`, rules `#DCD9D0`, secondary ink `#4A4C52`.
+Display face **Instrument Serif** at 400 with italic used as an emphasis device, at
+`clamp(52px,8.4vw,124px)` — a serif at that size on warm paper is a strong, unmistakable
+identity. Body Inter 17px, mono IBM Plex Mono for data. Accent is a deep green `#0A6B4C`
+chosen for contrast on paper, not the neon accent. Product plates are `#111215` with a
+`#0C0D10` field — the only dark surfaces on the page, which is exactly why they hold the eye.
+
+**Composition.** An editorial masthead hero: kicker, three-line serif headline with an italic
+mid-word, then a two-column block pairing the lead paragraph and CTA against a ruled facts
+list (version, platform, both file sizes, preset count, telemetry) laid out as data rather
+than as badges. Sections numbered like a journal — `01 / Designer`, `02 / Library`,
+`03 / Download` — in a 110px-plus-content grid. Capabilities as **ruled specification lists**
+(`<span>` term, text value, hairline between) rather than cards. Presets as a **real table**
+with hover, not a card grid. Download as two bordered options with the SmartScreen note in a
+left-ruled callout.
+
+**What it is good at.** Nothing else in this category looks like it, which is a genuine
+differentiator for a product whose competitors all use neon-on-black. Long-form reading is
+materially more comfortable, which matters because crshhx has a real documentation section and
+a changelog. Editorial restraint reads as established rather than as eager. And the dark
+plates solve the §6 legibility constraint while making the product the focal point of every
+section by contrast alone.
+
+**What it risks.** A serif display is a strong taste commitment and the least safe of the
+three choices; if it misses, it reads as quaint rather than premium. Light chrome can feel
+less like software and more like publishing. Two surface worlds (paper and plate) must be kept
+consistent across five routes, which is more design surface to police. And the product appears
+as an inset artefact rather than as an environment, which slightly undersells the overlay.
+
+### Direction C — "Field & Studio": split contrast on one seam
+
+**The idea.** Not a style preference but a fact about the product: crshhx exists between two
+worlds. The **field** is the game — dark, full-screen, where the reticle is drawn. The
+**studio** is the editor — precise, light, where you control it. The site is laid out as that
+boundary, and the crosshair sits on it.
+
+**Treatment.** Field `#0B0C0E` with surfaces `#141619`/`#1D2025` and lines `#282C33`; studio
+`#F4F4F2` with lines `#D8D8D2`. One accent `#00E599` on the field side, a deep green
+`#0A6B4C` on the studio side — the same hue family, adjusted for its ground. Display face
+**Archivo 800** at `clamp(44px,5.6vw,86px)`, tracking −0.05em: bold, tight, graphic, and
+deliberately not a thin geometric face.
+
+**Composition.** The hero is a 50/50 split, field on the left and studio on the right, each
+half carrying its own kicker (`The field — what the game sees` / `The studio — what you
+control`), its own headline at its own scale, and its own content idiom: prose and the
+download CTA on the dark side, and the *actual control set* — length, thickness, gap,
+outline, rotation rendered as labelled sliders with values — on the light side. The reticle
+is absolutely positioned on the seam between them, over a soft radial so it reads on both
+grounds. Sections then alternate world: weapon slots on the field (rendered as keycaps,
+`1 Shotgun … F10 Toggle overlay`), the studio's guarantees on paper as four ruled columns, and
+download as a single panel split down the middle exactly like the hero, installer on the dark
+half and portable on the light half with its own ink button.
+
+**What it is good at.** It is the most original and most memorable of the three, and it is the
+only one whose form is derived from something *true about crshhx* rather than applied to it —
+which is the difference between looking designed and looking styled. It answers the brief's
+objection head-on: a light studio half is the direct opposite of generic dark developer
+documentation. It also gets the best of the light/dark argument instead of choosing a side —
+product legibility from the dark field, editorial readability from the light studio — and it
+gives the brand a graphic identity (the seam) that survives into OG images, screenshots and
+the application's own about screen.
+
+**What it risks.** Highest build and maintenance cost: two full palettes, two accent values
+and two type scales in use, every component needing a variant, and contrast verification
+doubled. The split collapses to a stacked pair on mobile, where the central idea is weakest
+and needs a deliberate fallback. Archivo 800 at large sizes tips into loud if used more than
+once per viewport. And the seam motif must not become a gimmick applied to every band — it
+earns its place as structure, not decoration.
+
+---
+
+## 16. Comparison and recommendation
+
+| Axis | A · Aperture | B · Paper & Precision | C · Field & Studio |
+|---|---|---|---|
+| Core idea | Lit subject in a dark room | Technical monograph | The product's own boundary |
+| Distinctiveness | Low — nearest the current look | High | Highest |
+| Reticle legibility | Excellent (field ≥ 5.2:1) | Good, but boxed on plates | Excellent on field, boxed on studio |
+| Long-form readability | Good | Best | Good (studio bands) |
+| Feels like software | Strong | Moderate | Strong |
+| Build cost from current code | Low | Medium-high | High |
+| Ongoing maintenance | Low | Medium (two surface worlds) | Highest (two palettes, two accents) |
+| Contrast-verification burden | 9 pairs | ~14 pairs | ~18 pairs |
+| Failure mode | Flat, generic | Quaint, undersells the overlay | Loud, gimmicky, costly |
+| Mobile robustness | Strong | Strong | Weakest — the split stacks |
+
+**Recommendation: Direction C as the identity, executed with Direction A's restraint, and
+Direction B's editorial rigour on the long-form routes.**
+
+Why C wins, in order of weight:
+
+1. **It is the only direction whose form is a consequence of the product.** A and B are both
+   excellent *treatments* that could be applied to almost any developer tool. C could only be
+   crshhx: an overlay that lives between a dark game and a light editor. That is what makes a
+   site look designed rather than styled, and it is the direct answer to "generic and
+   template-like" — a template cannot have a concept, and this one does.
+2. **It resolves the light-versus-dark question instead of picking a side.** The measured
+   constraint in §6 is real: reticles need a dark field, and long-form reading prefers light.
+   C satisfies both by assigning each to the surface where it belongs. A ignores the second,
+   B boxes the first.
+3. **It most decisively breaks the appearance the brief objects to.** Half of every screen is
+   light. The dark half is no longer a documentation theme because it is not alone.
+4. **It gives the brand a graphic device** — the seam, and a reticle straddling it — that
+   works in the OG cover, in a README header and eventually in the application itself.
+
+Why it must be restrained rather than adopted wholesale: C's failure mode is loudness, and the
+brief explicitly forbids gimmickry. Three rules, therefore. **The split is used as structure
+at most three times on the homepage** (hero, one capability band, download) and never as
+decoration on every section. **Display weight is capped** — one Archivo 800 headline per
+viewport, everything else at 600 or below. **The accent stays rare**, as in A: it appears on
+the CTA, the active control and one or two data points, never as a wash.
+
+Why not A alone: it is the safest and cheapest, and if build cost were the deciding factor it
+would win. But it is the closest of the three to the look already rejected, and it carries no
+idea of its own — it would need to earn its premium feel purely through typography and
+spacing, which is precisely the discipline the current site failed at (§7). Choosing it would
+be choosing to fix the symptoms.
+
+Why not B alone: it is genuinely strong and the most readable, and its components are worth
+stealing. But a serif masthead makes crshhx look like a publication about an instrument
+rather than the instrument, which undersells the product at the exact moment a first-time
+visitor decides whether to download an unsigned 85 MB executable. Its editorial devices are
+better employed where reading is the task.
+
+**What is taken from each.** From A: the rare-accent rule, the borderless specification rail,
+the asymmetric hero alignment, and the discipline of one composition per section. From B:
+ruled specification lists instead of card grids, presets as a real table, numbered sections on
+`/docs` and `/changelog`, and the left-ruled callout for the SmartScreen note. From C: the
+two-world palette, the seam, Archivo's display weight, and the alternating band structure.
+
+**If build cost is the deciding factor**, the fallback order is A then B, and A can be
+delivered in stage 2 with the existing components largely intact. That decision is recorded in
+§19 as an open question rather than assumed.
+
+---
+
+## 17. Proposed design system
+
+§8 above specifies a token system, and it remains valid, but it was written for a single dark
+world. Under the recommended direction it is extended as follows. Where §8 and this section
+conflict, **this section wins** — but only once a direction is chosen; until then §8 is the
+fallback (it describes Direction A).
+
+**Surfaces — two worlds, one scale.** Each world has four steps and nothing else, so a
+component never has to invent a fifth: field `#0B0C0E` → raised `#141619` → sunken
+`#0C0D10` → plate `#1D2025`; studio `#F4F4F2` → raised `#EAEAE6` → sunken `#FFFFFF` →
+plate `#DCDCD6`. Lines are `#282C33` and `#D8D8D2`. Any surface outside this set is a bug.
+
+**Text — three steps per world, all AA-verified.** Field `#F0F1F3` / `#9BA1A9` / `#6E747C`;
+studio `#14161A` / `#4C5058` / `#7B8089`. The third step is the one that failed before
+(`#6B767E`, 4.16:1) and is verified in the build gate, not by eye.
+
+**Accent — one hue, two values, never a wash.** `#00E599` on field grounds, `#0A6B4C` on
+studio grounds; both clear 4.5:1 as text on their own world. On-accent text `#06231C`. The
+12% tint fill and 30% tint border remain permitted for a selected control; the accent is
+never used as a background band, a gradient or a glow.
+
+**Typography — the hierarchy the current site lacks.** Display: Archivo 800,
+`clamp(44px,5.6vw,86px)`, line-height 0.92–0.98, tracking −0.05em, **one per viewport**.
+Section: Archivo 700, `clamp(32px,4.4vw,64px)`, tracking −0.045em. Sub-section: 600 at 19–23px.
+Lead: 400 at 18–19px, max 48ch, one per section. Body: 400 at 16.5–17px, line-height 1.6,
+max 68ch. Data: JetBrains Mono 12px. Eyebrow: mono 11px, tracking +0.18em, uppercase —
+replacing the current overused pill. Hero-to-body ratio moves from ~3.7× to ~5.2×, and
+crucially **no two heading levels share a weight**, which is the single change that most
+directly fixes §7's primary finding.
+
+**Spacing and grid.** A 4px ramp to 208 (`4 8 12 16 24 32 48 64 96 128 160 208`),
+`--section-y: clamp(64px,8vw,120px)`, container 1320px on the marketing routes (wider than
+today's 1120px, to give the split room) and 1120px on `/docs`. The automatic
+`.section + .section { border-top }` is removed: separation comes from alternating world or
+from space, never from a rule applied by default.
+
+**Shape.** Two radii, 4px for controls and 8px for panels — tighter than today's 6/10/14
+trio, because softer corners read as generic. Product frames get distinct chrome (bar, 1px
+line, inset shadow, sunken interior) so they never resemble content cards.
+
+**Buttons.** One primary per viewport. Primary is a solid fill with the accent or ink of its
+world, 48px, 600 weight, 4px radius, 1px lift on hover; secondary is a 1px outline that
+brightens its border rather than filling. Every button states a fact where a fact is
+available — `Download · 84.7 MB`, `v1.1.0 · Windows 10 & 11 · 64-bit` — following the Raycast
+pattern, because that microcopy does the trust work a badge cannot.
+
+**Motion.** Three classes only, all off under `prefers-reduced-motion`: *enter* (Reveal,
+420ms, ≤12px translate, once); *intent* (≤180ms on hover/focus/active); *demonstration* (the
+overlay's own behaviour — ADS morph, firing bloom, preset switch, slot cycling). One easing
+curve site-wide, `cubic-bezier(.2,.6,.2,1)`. No library, no marquee, no parallax beyond the
+pointer-tracking already in `Playground.tsx`, no scroll-jacking, nothing that blinks. The
+test for any animation is the five purposes in §3: does it give feedback, aid orientation,
+direct attention, show causality or express the brand? If it only decorates, it goes.
+
+**Responsive.** Breakpoints `<640 / 640–1023 / 1024–1439 / ≥1440`, `clamp()` everywhere,
+44px minimum targets, and no horizontal overflow asserted at 360/768/1024/1440. The split
+hero stacks below 980px with the reticle re-anchored to the bottom-right of the field half
+rather than to a seam that no longer exists — this is the one place Direction C needs a
+designed fallback rather than a reflow, and it is called out here so it is not forgotten.
+
+**Fonts.** Self-hosted woff2 latin subsets only, `font-display: swap`, CSS before JS.
+Direction C needs Archivo (700/800), Inter (400/500/600) and JetBrains Mono (400) — three
+families where the site has three today, but a different set, so the payload changes. The
+current budget is 132,000 B raw against 119,708 B used; **adding Archivo 800 while keeping
+Inter and Space Grotesk would exceed it**, so Space Grotesk is dropped and the budget is
+re-measured and re-set in stage 2 rather than silently raised. The Google Fonts links in the
+concept pages are preview-only and must not be copied into `website/`.
+
+---
+
+## 18. Page-by-page redesign plan
+
+Five routes plus a 404. Each entry states the job of the page, the structure, and what is
+deliberately *not* on it.
+
+**`/` Home — make the product undeniable in one screen.**
+Seam hero (field half: three-line headline "Drawn over the game. Never inside it.", one
+paragraph on the passive hook, the download CTA with the requirement line beneath it; studio
+half: the real control set, live-adjustable via the existing `Playground`). Reticle on the
+seam, rendered by `Reticle.tsx` from real parameters, captioned with `MOCK_DISCLOSURE`.
+Specification rail — 258 presets / 5 slots / F10 / 0 telemetry — borderless. Then three
+capability bands alternating world: weapon slots (field, rendered as keycaps), the studio's
+guarantees (paper, four ruled columns: library, transfer, profiles, compensation), and the
+overlay's behaviour (field, ADS morph and firing bloom demonstrated). Download strip. Footer.
+**Not on it:** testimonials, customer counts, awards, an integrations wall, a logo grid, a
+video hero, an FAQ (that lives on `/docs`), or a second CTA above the fold.
+
+**`/features` — the deep dive, one composition per capability.**
+Six capabilities in the Raycast-for-Windows grammar but never the same layout twice: a naming
+chip identifying a real application view, a two-part headline, one line of explanation, then a
+genuine surface. Designer (annotated plate with parameter callouts), Library (a real table of
+presets with topology counts), Transfer (a versioned export artefact shown as data), Profiles
+(including the honest "stops switching rather than guesses" behaviour), Slots (real defaults
+plus the passive-hook explanation), Overlay (ADS morph, firing bloom, keycaps). Each surface
+is a rendered component, not an image, so it stays truthful and costs no bytes.
+**Not on it:** icon-in-a-rounded-box grids, "and much more", feature counts that cannot be
+verified, or a repeated two-column layout six times — the current page's actual defect.
+
+**`/download` — earn the decision at the decision point.**
+The Linear `/download` page is strikingly sparse: an icon, a heading, one line, and bare
+platform rows with no hashes, sizes, guidance or troubleshooting. That restraint is correct
+for an established, signed product and **wrong here**: crshhx ships an unsigned 85 MB
+executable, so the trust work has to happen on this page. Structure: version and platform
+facts; a split panel — installer on the field half with the recommended accent button,
+portable on the studio half — each stating its size, its SHA-256 behind an expandable
+"Verify download" with a working Copy button and the `certutil` command, and what it does
+differently; a left-ruled SmartScreen callout using B's treatment; a three-step install guide;
+a requirements table; single-column troubleshooting. The pending-release state keeps its
+existing honest behaviour, pinned by `downloadPending.test.tsx`. **Not on it:** three pills on
+one surface (today's defect), a ZIP or intermediate artefact, invented compatibility claims,
+or any statement that the build was tested on physical hardware.
+
+**`/docs` — Direction B's editorial rigour, because reading is the task.**
+Numbered sections, a sticky contents rail on `≥1024px`, ruled specification tables, mono for
+every parameter name and value, one accent for links and nothing else. Long-form measure held
+to 68ch with 1.65 leading. Every illustrated control carries `MOCK_DISCLOSURE`. This is the
+route where a light ground is most defensible and where B's serif-adjacent calm pays off;
+whether `/docs` runs in the studio world or on paper is an open question (§19). **Not on it:**
+accordion nesting deeper than two levels, code blocks in colours that fail contrast, or
+documentation of a feature the application does not have.
+
+**`/changelog` — a release history, not a feed.**
+Dated entries newest-first, each with a version heading in display weight, a one-line summary
+and a link to the release on GitHub, following Linear's pattern of title plus one or two
+sentences rather than a wall of notes. The published 1.1.0 entry and the 1.0.0 development
+note are the only entries that exist and the only entries shown; the 1.0.0 entry is not
+touched. Status language is factual — "released" and "in development" — with at most one
+status marker per entry. The route's description is corrected: it currently claims nothing has
+been published, which has been untrue since v1.1.0. **Not on it:** fabricated releases,
+backdated entries, or a roadmap promising undated features.
+
+**`/404` — one line and a way out.**
+Keeps `noindex`, states the page does not exist, offers the three real destinations. A small
+rendered reticle is the only decoration. **Not on it:** a joke, a search box with nothing to
+search, or a full navigation duplicate.
+
+**Cross-cutting.** One `<h1>` per route; unique title, description, canonical, `og:url` and
+`og:image`; skip link and `main#main` preserved; focus-visible states on every interactive
+element; the manifest-driven release rendering untouched so URLs, sizes and digests cannot
+drift; and `verify-dist.mjs` extended to cover the second palette's contrast pairs before any
+of this ships.
+
+---
+
+## 19. Status, and what is blocked
+
+**Delivered in this phase.** The reference research (§1–§4) with its access limits stated; the
+measured audit of the current site (§7); the corrected light/dark finding (§6, §14); three
+built directions (§15) as working pages; a comparison and a reasoned recommendation (§16); a
+design system for the recommended direction (§17); a page-by-page plan (§18).
+
+**Already shipped on this branch, before the redesign was re-scoped.** A CI gate for
+`website/` (`.github/workflows/website.yml`), which proved necessary because no job ran the
+website's tests and a live failure was sitting on `main`; the production SEO default origin,
+canonical, `og:url` and sitemap; a contrast fix to `#868C98`; removal of the grid, HUD and
+glow treatments; and a test pinning the preset count at 258. Website 61/61, application
+1185/1185, both typechecks clean, build and `verify-dist.mjs` passing. Committed and pushed;
+**no pull request opened, nothing merged, nothing deployed.**
+
+**Blocked, and reported rather than worked around.** Visual inspection of any website,
+including crshhx's own production pages (§14). Browser automation, screenshots, Lighthouse,
+Core Web Vitals, real-device responsive behaviour, and keyboard or screen-reader passes
+conducted by me. Every Cloudflare Pages setting, because the configuration is dashboard-only
+and `dash.cloudflare.com` is unreachable. Whether `crshhx.com` is the intended domain — it did
+not resolve when fetched, and `SITE_URL` must not be pointed at an unconfirmed origin.
+Verification of the Windows build on physical hardware, which remains the owner's step.
+
+**Open questions for the owner.** (1) **Direction** — C as recommended, or A or B, after
+looking at the built pages. (2) **Budget for the direction** — C roughly doubles the contrast
+pairs to verify and needs a second palette in tokens and tests; if that cost is not wanted, A
+is the fallback and can ship from the existing components. (3) **`/docs` ground** — studio
+dark or paper light. (4) **Display face** — Archivo needs a self-hosted subset added and Space
+Grotesk dropped to stay inside the font budget; confirm that trade. (5) **Domain** — confirm
+the production origin before `SITE_URL` is set.
+
+**Next step, once a direction is chosen.** Stage 2 implements it on this branch: tokens and
+typography first, then the homepage, then `/features`, `/download`, `/docs`, `/changelog` and
+`/404`, with `verify-dist.mjs` extended before each route rather than after all of them. A
+pull request will be opened for review; **nothing will be merged or deployed until the
+redesign has been reviewed and approved.**

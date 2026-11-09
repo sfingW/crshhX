@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Direction B — Paper &amp; Precision · crshhx concept</title>
+<!-- CONCEPT PREVIEW ONLY. Webfonts are linked so the direction can be judged with
+     its real display face. Never ships: production self-hosts woff2 subsets and
+     verify-dist.mjs fails the build on any non-first-party origin. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F6F5F1; --paper2:#EFEDE7; --ink:#15161A; --ink2:#4A4C52; --ink3:#7C7E85;
+    --rule:#DCD9D0; --plate:#111215; --plate2:#1B1C22;
+    --green:#0A6B4C; --green-hi:#0E8A61;
+    --cyan:#35E0FF; --lime:#2BE08A; --white:#F2F5F6; --amber:#FFC24D; --magenta:#FF5EA8; --red:#FF5C5C;
+    --display:'Instrument Serif',Georgia,serif;
+    --body:'Inter',system-ui,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --gut:clamp(20px,5vw,64px);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);
+    font-size:17px;line-height:1.62;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1180px;margin-inline:auto;padding-inline:var(--gut)}
+  .mono{font-family:var(--mono);font-size:12px;letter-spacing:.02em;color:var(--ink3)}
+
+  header{border-bottom:1px solid var(--rule);background:var(--paper)}
+  .nav{display:flex;align-items:center;gap:30px;height:70px}
+  .mark{display:flex;align-items:center;gap:10px;font-family:var(--display);font-size:22px;letter-spacing:-.01em}
+  .nav ul{display:flex;gap:26px;list-style:none;margin:0;padding:0;font-size:14.5px;color:var(--ink2)}
+  .nav ul a{border-bottom:1px solid transparent;padding-bottom:2px}
+  .nav ul a:hover{color:var(--ink);border-color:var(--ink)}
+  .spacer{flex:1}
+  .btn{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 20px;
+    border-radius:3px;font-size:14.5px;font-weight:500;
+    transition:background .18s cubic-bezier(.2,.6,.2,1),color .18s,border-color .18s}
+  .btn-ink{background:var(--ink);color:var(--paper)}
+  .btn-ink:hover{background:#2C2E35}
+  .btn-line{border:1px solid var(--rule);color:var(--ink)}
+  .btn-line:hover{border-color:var(--ink)}
+  .btn-lg{height:50px;padding:0 28px;font-size:16px}
+
+  /* hero: an editorial masthead. Big serif, generous margins, rule under. */
+  .hero{padding:clamp(64px,8vw,110px) 0 clamp(40px,5vw,64px);border-bottom:1px solid var(--rule)}
+  .kicker{font-family:var(--mono);font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--green);margin-bottom:26px}
+  h1{font-family:var(--display);font-weight:400;margin:0;
+    font-size:clamp(52px,8.4vw,124px);line-height:.92;letter-spacing:-.02em}
+  h1 i{font-style:italic;color:var(--ink3)}
+  .hero-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,340px);
+    gap:clamp(28px,4vw,64px);margin-top:38px;align-items:end}
+  .lead{margin:0;font-size:19px;line-height:1.58;color:var(--ink2);max-width:56ch}
+  .facts{border-top:1px solid var(--rule);padding-top:14px;display:grid;gap:7px}
+  .facts div{display:flex;justify-content:space-between;gap:14px;font-family:var(--mono);font-size:12px}
+  .facts b{font-weight:500;color:var(--ink)}
+  .cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:34px}
+
+  /* the product sits on a dark plate — the only dark surface on the page,
+     which is exactly why it holds the eye */
+  .plate{background:var(--plate);border-radius:6px;padding:clamp(20px,3vw,34px);color:#E8E9EC}
+  .plate-head{display:flex;align-items:center;gap:10px;margin-bottom:20px;
+    font-family:var(--mono);font-size:11px;color:#8A8F98;letter-spacing:.04em}
+  .dot{width:8px;height:8px;border-radius:50%;background:#2A2D34}
+  .field{background:#0C0D10;border-radius:4px;display:grid;place-items:center;
+    aspect-ratio:16/9;position:relative}
+  .field::before,.field::after{content:'';position:absolute;background:#1D2027}
+  .field::before{left:50%;top:0;bottom:0;width:1px}
+  .field::after{top:50%;left:0;right:0;height:1px}
+  .plate .cap{font-family:var(--mono);font-size:11px;color:#7E838C;margin-top:14px}
+
+  /* sections numbered like a technical journal */
+  .sec{padding:clamp(56px,7vw,104px) 0;border-bottom:1px solid var(--rule)}
+  .sec-head{display:grid;grid-template-columns:110px minmax(0,1fr);gap:clamp(20px,3vw,48px);
+    align-items:start;margin-bottom:clamp(30px,4vw,52px)}
+  .sec-num{font-family:var(--mono);font-size:12px;color:var(--ink3);padding-top:12px}
+  h2{font-family:var(--display);font-weight:400;margin:0;
+    font-size:clamp(34px,4.6vw,64px);line-height:1;letter-spacing:-.02em}
+  h2 i{font-style:italic;color:var(--ink3)}
+  .sec-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    gap:clamp(28px,4vw,64px);align-items:start}
+  .sec-body p{margin:0;color:var(--ink2);max-width:54ch}
+  .sec-body p+p{margin-top:16px}
+  .lede{font-size:19px;color:var(--ink)!important}
+
+  ul.spec{list-style:none;margin:22px 0 0;padding:0;border-top:1px solid var(--rule)}
+  ul.spec li{display:flex;gap:16px;padding:11px 0;border-bottom:1px solid var(--rule);font-size:14.5px}
+  ul.spec li span{font-family:var(--mono);font-size:11.5px;color:var(--ink3);min-width:88px;padding-top:2px}
+
+  /* preset table, not a card grid */
+  table{width:100%;border-collapse:collapse;font-size:14.5px}
+  th{text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--ink3);font-weight:400;
+    padding:0 12px 10px 0;border-bottom:1px solid var(--rule)}
+  td{padding:13px 12px 13px 0;border-bottom:1px solid var(--rule);vertical-align:middle}
+  tr:hover td{background:var(--paper2)}
+  td.n{font-family:var(--mono);font-size:12px;color:var(--ink3)}
+
+  .note{background:var(--paper2);border-left:2px solid var(--green);padding:16px 20px;
+    font-size:14.5px;color:var(--ink2);margin-top:26px}
+
+  .dl{padding:clamp(56px,7vw,96px) 0}
+  .dl-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(20px,3vw,40px)}
+  .opt{border:1px solid var(--rule);border-radius:6px;padding:26px;background:var(--paper)}
+  .opt.rec{border-color:var(--ink)}
+  .opt h3{font-family:var(--display);font-weight:400;font-size:28px;margin:8px 0 0;letter-spacing:-.01em}
+  .opt p{margin:10px 0 20px;font-size:14.5px;color:var(--ink2)}
+  .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--green)}
+
+  footer{border-top:1px solid var(--rule);padding:44px 0;color:var(--ink3);font-size:13.5px}
+  .foot{display:flex;flex-wrap:wrap;gap:18px;justify-content:space-between}
+  .foot nav{display:flex;gap:20px}
+  .foot a:hover{color:var(--ink)}
+
+  @media (max-width:900px){
+    .hero-cols,.sec-body,.sec-head,.dl-grid{grid-template-columns:1fr}
+    .sec-num{padding-top:0}
+    .nav ul{display:none}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="mark" href="#">
+      <svg width="17" height="17" viewBox="0 0 120 120" aria-hidden="true">
+        <g fill="#0A6B4C"><rect x="57" y="14" width="6" height="30" rx="3"/>
+        <rect x="57" y="76" width="6" height="30" rx="3"/>
+        <rect x="14" y="57" width="30" height="6" rx="3"/>
+        <rect x="76" y="57" width="30" height="6" rx="3"/></g>
+      </svg>crshhx
+    </a>
+    <ul><li><a href="#">Features</a></li><li><a href="#">Documentation</a></li><li><a href="#">Changelog</a></li></ul>
+    <span class="spacer"></span>
+    <span class="mono">Version 1.1.0</span>
+    <a class="btn btn-ink" href="#">Download</a>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <div class="kicker">Crshhx Crosshair Studio — for Windows</div>
+    <h1>A crosshair<br>you can <i>actually</i><br>design.</h1>
+    <div class="hero-cols">
+      <div>
+        <p class="lead">Most overlay tools give you a colour picker and four sliders.
+          crshhx gives you the geometry: per-arm length and thickness, gap, rotation,
+          outlines, centre dot, spread ring and glow — drawn above the game exactly as
+          you set them, and organised in a library that stays on your machine.</p>
+        <div class="cta">
+          <a class="btn btn-ink btn-lg" href="#">Download for Windows</a>
+          <a class="btn btn-line btn-lg" href="#">Read the documentation</a>
+        </div>
+      </div>
+      <div class="facts">
+        <div><span>Version</span><b>1.1.0</b></div>
+        <div><span>Platform</span><b>Windows 10 &amp; 11, 64-bit</b></div>
+        <div><span>Installer</span><b>84.7 MB</b></div>
+        <div><span>Portable</span><b>77.7 MB</b></div>
+        <div><span>Presets</span><b>258 built in</b></div>
+        <div><span>Telemetry</span><b>None</b></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">01 / Designer</div>
+      <h2>The editor draws <i>what the overlay draws.</i></h2>
+    </div>
+    <div class="sec-body">
+      <div>
+        <p class="lede">There is no preview approximation. The editor works on the
+          overlay’s own schema, so the reticle you compose is the reticle the game sees.</p>
+        <ul class="spec">
+          <li><span>Arms</span>Per-arm presence, length 0–12 and thickness 0–6</li>
+          <li><span>Gap</span>−4 to 12, including negative overlap</li>
+          <li><span>Outline</span>Outer and inner, 0–6, own colour and opacity</li>
+          <li><span>Centre dot</span>Square or round, 0–6</li>
+          <li><span>Ring</span>Spread ring, radius and thickness</li>
+          <li><span>Transform</span>Rotation in 15° steps, scale, offset</li>
+          <li><span>Compare</span>Diff a held snapshot against the working copy</li>
+        </ul>
+      </div>
+      <div class="plate">
+        <div class="plate-head"><i class="dot"></i><i class="dot"></i><i class="dot"></i>
+          <span style="margin-left:6px">Crshhx Crosshair Studio — Designer</span></div>
+        <div class="field">
+          <svg width="190" height="190" viewBox="0 0 120 120" role="img"
+               aria-label="Crosshair preview with four arms, outline and centre dot">
+            <g fill="#000"><rect x="55" y="33" width="10" height="28" rx="5"/>
+              <rect x="55" y="59" width="10" height="28" rx="5"/>
+              <rect x="33" y="55" width="28" height="10" rx="5"/>
+              <rect x="59" y="55" width="28" height="10" rx="5"/>
+              <circle cx="60" cy="60" r="5"/></g>
+            <g fill="#35E0FF"><rect x="57" y="35" width="6" height="24" rx="3"/>
+              <rect x="57" y="61" width="6" height="24" rx="3"/>
+              <rect x="35" y="57" width="24" height="6" rx="3"/>
+              <rect x="61" y="57" width="24" height="6" rx="3"/>
+              <circle cx="60" cy="60" r="3"/></g>
+          </svg>
+        </div>
+        <div class="cap">Illustrative preview, rendered from the application’s real parameters — not a screenshot.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">02 / Library</div>
+      <h2>258 presets, <i>filed not fused.</i></h2>
+    </div>
+    <div class="sec-body">
+      <div>
+        <p class="lede">Organisation metadata lives in a sidecar keyed by preset id, so
+          filing, renaming or favouriting a built-in never modifies it, and a shipped
+          preset cannot be overwritten by an edit or an import.</p>
+        <p>Search and sort by name, game, recency or favourite, with counts that stay
+          correct. Favourites are a single store; the legacy key is migrated on first read.</p>
+      </div>
+      <div>
+        <table>
+          <thead><tr><th>Preset</th><th>Game</th><th style="text-align:right">Geometry</th></tr></thead>
+          <tbody>
+            <tr><td><svg width="20" height="20" viewBox="0 0 120 120" style="vertical-align:-5px" aria-hidden="true"><g fill="#35E0FF"><rect x="57" y="34" width="6" height="24" rx="3"/><rect x="57" y="62" width="6" height="24" rx="3"/><rect x="34" y="57" width="24" height="6" rx="3"/><rect x="62" y="57" width="24" height="6" rx="3"/></g></svg> Cyan Duelist (One-Tap)</td><td class="n">valorant</td><td class="n" style="text-align:right">4 / 2 / 2</td></tr>
+            <tr><td><svg width="20" height="20" viewBox="0 0 120 120" style="vertical-align:-5px" aria-hidden="true"><g fill="#2BE08A"><circle cx="60" cy="60" r="8"/></g></svg> Apex Anchor (Micro Green)</td><td class="n">cs2</td><td class="n" style="text-align:right">2 / 1 / −1</td></tr>
+            <tr><td><svg width="20" height="20" viewBox="0 0 120 120" style="vertical-align:-5px" aria-hidden="true"><g fill="#FF5C5C"><rect x="55" y="34" width="10" height="24" rx="5"/><rect x="55" y="62" width="10" height="24" rx="5"/><rect x="34" y="55" width="52" height="10" rx="5"/></g></svg> Pump Breacher (Shotgun)</td><td class="n">fortnite</td><td class="n" style="text-align:right">3 / 2 / 8</td></tr>
+            <tr><td><svg width="20" height="20" viewBox="0 0 120 120" style="vertical-align:-5px" aria-hidden="true"><g fill="none" stroke="#FFC24D" stroke-width="7"><circle cx="60" cy="60" r="26"/></g></svg> Sniper Prodigy (Flick Pin)</td><td class="n">cs2</td><td class="n" style="text-align:right">2 / 1 / −2</td></tr>
+            <tr><td><svg width="20" height="20" viewBox="0 0 120 120" style="vertical-align:-5px" aria-hidden="true"><g fill="#F2F5F6"><rect x="58" y="36" width="4" height="22" rx="2"/><rect x="58" y="62" width="4" height="22" rx="2"/><rect x="36" y="58" width="22" height="4" rx="2"/><rect x="62" y="58" width="22" height="4" rx="2"/></g></svg> Ghost Operator (Clean White)</td><td class="n">valorant</td><td class="n" style="text-align:right">3 / 1 / 2</td></tr>
+          </tbody>
+        </table>
+        <div class="mono" style="margin-top:12px">By topology: cross 98 · dot 59 · circle 54 · chevron 35 · t-shape 12</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">03 / Download</div>
+      <h2>Two builds, <i>one library.</i></h2>
+    </div>
+    <div class="dl-grid">
+      <div class="opt rec">
+        <div class="tag">Recommended</div>
+        <h3>Windows Installer</h3>
+        <p>One-click installation, adds a Start menu shortcut, and keeps your library
+          outside the install folder so an update never touches it.</p>
+        <a class="btn btn-ink btn-lg" href="#">Download · 84.7 MB</a>
+        <div class="mono" style="margin-top:14px">crshhx-crosshair-studio-setup-1.1.0.exe · v1.1.0</div>
+      </div>
+      <div class="opt">
+        <div class="tag" style="color:var(--ink3)">Also available</div>
+        <h3>Portable</h3>
+        <p>No installation. Keep it on a drive or a USB stick; your library lives in your
+          roaming profile and follows you between machines.</p>
+        <a class="btn btn-line btn-lg" href="#">Download · 77.7 MB</a>
+        <div class="mono" style="margin-top:14px">crshhx-crosshair-studio-portable-1.1.0.exe · v1.1.0</div>
+      </div>
+    </div>
+    <div class="note">The application is not code-signed, so Windows SmartScreen may warn on
+      first run: choose “More info”, then “Run anyway”. Both builds publish a SHA-256 on the
+      download page, with the <span class="mono">certutil</span> command that reproduces it.</div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <span>crshhx — a local-first crosshair studio for Windows. No account, no telemetry, no cloud sync.</span>
+    <nav><a href="#">Features</a><a href="#">Documentation</a><a href="#">Changelog</a><a href="#">Repository</a></nav>
+  </div>
+</footer>
+
+</body>
+</html>

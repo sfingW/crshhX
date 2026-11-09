@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>crshhx — three design directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0B0C0E;--p:#141619;--line:#23262C;--t:#ECEEF1;--t2:#9BA1A9;--t3:#6E747C;--a:#00E599}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--t);font-family:'Inter',system-ui,sans-serif;
+    font-size:16.5px;line-height:1.62;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1000px;margin-inline:auto;padding:clamp(40px,7vw,88px) clamp(20px,5vw,40px)}
+  h1{font-size:clamp(30px,4.4vw,46px);line-height:1.05;letter-spacing:-.035em;margin:0 0 14px;font-weight:600}
+  .sub{color:var(--t2);max-width:66ch;margin:0 0 14px}
+  .mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:var(--t3)}
+  .warn{border-left:2px solid var(--a);background:var(--p);padding:14px 18px;margin:26px 0 40px;
+    font-size:14.5px;color:var(--t2)}
+  .cards{display:grid;gap:18px}
+  a.card{display:block;background:var(--p);border:1px solid var(--line);border-radius:10px;
+    padding:26px;text-decoration:none;color:inherit;
+    transition:border-color .18s cubic-bezier(.2,.6,.2,1),transform .18s}
+  a.card:hover{border-color:#3A4048;transform:translateY(-2px)}
+  .k{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--a);margin-bottom:12px}
+  h2{font-size:23px;margin:0 0 8px;letter-spacing:-.02em;font-weight:600}
+  p{margin:0 0 16px;color:var(--t2);font-size:15px}
+  .pros{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:0;padding:0;list-style:none;
+    border-top:1px solid var(--line);padding-top:16px}
+  .pros h3{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--t3);margin:0 0 8px;font-weight:400}
+  .pros ul{margin:0;padding-left:16px;font-size:13.5px;color:var(--t2)}
+  .pros li{margin-bottom:5px}
+  .verdict{margin-top:44px;border-top:1px solid var(--line);padding-top:26px}
+  .verdict h2{font-size:20px}
+  @media (max-width:680px){.pros{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="mono" style="margin-bottom:18px">crshhx · design research · phase 2</div>
+  <h1>Three directions, built to be looked at.</h1>
+  <p class="sub">Each concept below is a real, working HTML page — not a description and not
+    a mockup image. Open them, scroll them, resize the window, and judge them the way you
+    would judge a live site. All three use genuine crshhx copy and real product data:
+    258 presets, five weapon slots, v1.1.0, 84.7 MB and 77.7 MB, both SHA-256 digests,
+    F10 and F9. Nothing is invented and no testimonial, customer count or award appears.</p>
+
+  <div class="warn">
+    <strong>Two caveats before you look.</strong> These pages load their display faces from
+    Google Fonts so each direction can be judged with the typeface it actually intends —
+    that link must never ship, because the production site self-hosts woff2 subsets and the
+    build now fails on any non-first-party origin. And the crosshairs you see are drawn by
+    hand here as static SVG; in the real site they come from the existing
+    <span class="mono">Reticle.tsx</span> renderer, which mirrors the application's own
+    crosshair schema, and the interactive editor in the hero is the existing
+    <span class="mono">Playground.tsx</span>.
+  </div>
+
+  <div class="cards">
+
+    <a class="card" href="./a-aperture.html">
+      <div class="k">Direction A</div>
+      <h2>Aperture — immersive dark, product-lit</h2>
+      <p>One dark room, one lit subject. A 92px display headline against a large square
+        stage holding the reticle at scale, with a monospace readout. Capabilities are
+        presented as a specification rail with no borders and no cards — separated by space
+        alone — then two alternating product sections. The accent appears maybe six times
+        on the whole page.</p>
+      <div class="pros">
+        <div><h3>Strengths</h3><ul>
+          <li>Closest to Linear and Raycast's register</li>
+          <li>Every reticle colour is legible</li>
+          <li>Cheapest to build from the current code</li>
+          <li>Reads as a serious tool, not a game mod</li>
+        </ul></div>
+        <div><h3>Weaknesses</h3><ul>
+          <li>Nearest to the look you called generic dark dev-docs</li>
+          <li>Least distinctive of the three</li>
+          <li>Depends entirely on execution to avoid flatness</li>
+        </ul></div>
+      </div>
+    </a>
+
+    <a class="card" href="./b-paper.html">
+      <div class="k">Direction B</div>
+      <h2>Paper &amp; Precision — light editorial, dark plates</h2>
+      <p>A technical monograph. Warm paper, ink-black text, a high-contrast serif display at
+        up to 124px, sections numbered like a journal (01 / Designer), specification lists
+        ruled rather than boxed, and presets as a real table instead of a card grid. The
+        product appears on dark plates — the only dark surfaces on the page, which is
+        precisely why they hold the eye.</p>
+      <div class="pros">
+        <div><h3>Strengths</h3><ul>
+          <li>Genuinely unlike every gaming-adjacent site</li>
+          <li>Best long-form readability for the documentation</li>
+          <li>Editorial confidence reads as established</li>
+          <li>Dark plates make the product a focal point</li>
+        </ul></div>
+        <div><h3>Weaknesses</h3><ul>
+          <li>A serif display is a strong, less safe choice</li>
+          <li>Light chrome can feel less "software"</li>
+          <li>Two surface worlds to maintain consistently</li>
+        </ul></div>
+      </div>
+    </a>
+
+    <a class="card" href="./c-field-studio.html">
+      <div class="k">Direction C</div>
+      <h2>Field &amp; Studio — split contrast, one seam</h2>
+      <p>Built on a fact about the product rather than a style: crshhx exists between two
+        worlds — the game, which is dark and full-screen, and the editor, which is precise
+        and light. The hero splits down the middle, field on the left and studio on the
+        right, with the crosshair sitting exactly on the seam. Bands then alternate world
+        down the page, and the download panel is split the same way.</p>
+      <div class="pros">
+        <div><h3>Strengths</h3><ul>
+          <li>The most original and most memorable</li>
+          <li>The concept is true to the product, not applied to it</li>
+          <li>Strong graphic identity, instantly recognisable</li>
+          <li>Solves light-vs-dark by using both deliberately</li>
+        </ul></div>
+        <div><h3>Weaknesses</h3><ul>
+          <li>Highest build and maintenance cost</li>
+          <li>The split collapses to a stack on mobile</li>
+          <li>Bold type can tip into loud if overused</li>
+        </ul></div>
+      </div>
+    </a>
+
+  </div>
+
+  <div class="verdict">
+    <h2>Recommendation</h2>
+    <p class="sub"><strong>C as the identity, executed with A's restraint.</strong> Direction
+      C is the only one of the three whose form comes from something true about crshhx rather
+      than from a style preference, which is what makes it look designed instead of styled —
+      and it answers your objection directly, because a light studio half is the opposite of
+      generic dark developer documentation. But C alone risks being loud, so it should borrow
+      A's discipline: the accent stays rare, no section repeats a layout, and the split is
+      used as a structural idea at maybe three moments on the homepage rather than as
+      decoration on every band. Direction B's editorial rigour — ruled specification lists,
+      presets as a table, numbered sections — is the right treatment for the documentation
+      and changelog regardless of which hero wins.</p>
+    <p class="mono">Full reasoning, the design system and the page-by-page plan:
+      docs/design/website-redesign.md</p>
+  </div>
+
+</div>
+</body>
+</html>

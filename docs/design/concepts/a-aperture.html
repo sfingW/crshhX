@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Direction A — Aperture · crshhx concept</title>
+<!-- CONCEPT PREVIEW ONLY. The Google Fonts link below exists so the direction can
+     be judged with its real display face. It must never ship: the production site
+     self-hosts woff2 subsets and verify-dist.mjs fails the build on any origin
+     other than the repository and the site itself. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --page:#08090B; --raised:#0E1013; --field:#12141A; --line:#1E2128;
+    --text:#ECEDEF; --text2:#9AA0A6; --text3:#71767D;
+    --accent:#00E599; --cyan:#35E0FF; --white:#F2F5F6;
+    --display:'Inter Tight','Inter',system-ui,sans-serif;
+    --body:'Inter',system-ui,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+    --gut:clamp(20px,5vw,64px);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--page);color:var(--text);font-family:var(--body);
+    font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1240px;margin-inline:auto;padding-inline:var(--gut)}
+  .mono{font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--text3)}
+
+  /* nav — no border at rest, hairline only once scrolled (simulated here) */
+  header{position:sticky;top:0;z-index:20;background:rgba(8,9,11,.82);
+    backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+  .nav{display:flex;align-items:center;gap:32px;height:64px}
+  .mark{display:flex;align-items:center;gap:10px;font-family:var(--display);
+    font-weight:600;letter-spacing:-.02em;font-size:17px}
+  .nav ul{display:flex;gap:28px;list-style:none;margin:0;padding:0;
+    font-size:14.5px;color:var(--text2)}
+  .nav ul a:hover{color:var(--text)}
+  .nav .spacer{flex:1}
+  .btn{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 18px;
+    border-radius:7px;font-size:14.5px;font-weight:600;font-family:var(--display);
+    letter-spacing:-.01em;transition:transform .16s cubic-bezier(.2,.6,.2,1),background .16s}
+  .btn-accent{background:var(--accent);color:#06110C}
+  .btn-accent:hover{background:#3BF0B4;transform:translateY(-1px)}
+  .btn-quiet{border:1px solid var(--line);color:var(--text)}
+  .btn-quiet:hover{border-color:#33383F;background:var(--raised)}
+  .btn-lg{height:48px;padding:0 24px;font-size:16px;border-radius:8px}
+
+  /* hero — asymmetric 7/5, product is the right half */
+  .hero{padding:clamp(72px,10vw,132px) 0 clamp(56px,7vw,96px)}
+  .hero-grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);
+    gap:clamp(32px,5vw,72px);align-items:center}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--accent);margin-bottom:22px}
+  h1{font-family:var(--display);font-weight:600;margin:0;
+    font-size:clamp(46px,6.4vw,92px);line-height:.96;letter-spacing:-.045em}
+  h1 em{font-style:normal;color:var(--text3)}
+  .lead{margin:26px 0 0;max-width:46ch;font-size:19px;line-height:1.55;color:var(--text2)}
+  .cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:34px;align-items:center}
+  .req{font-family:var(--mono);font-size:12px;color:var(--text3);margin-top:18px}
+  .req b{color:var(--text2);font-weight:500}
+
+  /* the stage: a dark field with a real crosshair, drawn as the product draws it */
+  .stage{position:relative;background:var(--field);border:1px solid var(--line);
+    border-radius:14px;aspect-ratio:1/.92;display:grid;place-items:center;overflow:hidden}
+  .stage::before,.stage::after{content:'';position:absolute;background:#23262E}
+  .stage::before{left:50%;top:0;bottom:0;width:1px}
+  .stage::after{top:50%;left:0;right:0;height:1px}
+  .stage svg{position:relative}
+  .stage-tag{position:absolute;left:14px;bottom:12px;font-family:var(--mono);
+    font-size:11px;color:var(--text3);letter-spacing:.04em}
+  .stage-read{position:absolute;right:14px;top:12px;font-family:var(--mono);
+    font-size:11px;color:var(--text3);text-align:right;line-height:1.7}
+
+  /* spec rail — deliberately NOT cards. Separated by space, not borders. */
+  .rail{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:clamp(24px,3vw,48px);padding:clamp(40px,5vw,64px) 0;
+    border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .rail dt{font-family:var(--display);font-size:clamp(30px,3.2vw,44px);
+    font-weight:600;letter-spacing:-.04em;line-height:1;margin:0 0 10px}
+  .rail dd{margin:0;font-size:14px;color:var(--text2);line-height:1.5}
+
+  /* capability sections alternate alignment so nothing repeats */
+  .cap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    gap:clamp(32px,5vw,80px);align-items:center;
+    padding:clamp(64px,8vw,120px) 0}
+  .cap.flip .cap-copy{order:2}
+  .cap h2{font-family:var(--display);font-weight:600;margin:14px 0 0;
+    font-size:clamp(30px,3.6vw,50px);line-height:1.04;letter-spacing:-.038em}
+  .cap p{margin:18px 0 0;color:var(--text2);max-width:52ch}
+  .cap .idx{font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;color:var(--text3)}
+  .plate{background:var(--raised);border:1px solid var(--line);border-radius:14px;
+    padding:20px}
+  .plate-bar{display:flex;gap:7px;margin-bottom:16px}
+  .plate-bar i{width:9px;height:9px;border-radius:50%;background:#25282F}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+  .chip{border:1px solid var(--line);border-radius:999px;padding:5px 12px;
+    font-family:var(--mono);font-size:11px;color:var(--text2)}
+  .chip:hover{border-color:#33383F;color:var(--text)}
+  .grid-ret{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .grid-ret div{background:var(--field);border-radius:9px;aspect-ratio:1;
+    display:grid;place-items:center}
+  .caption{font-family:var(--mono);font-size:11px;color:var(--text3);margin-top:14px}
+
+  /* download strip — one line of real measured facts, Raycast-style */
+  .dl{background:var(--raised);border-top:1px solid var(--line);
+    border-bottom:1px solid var(--line);padding:clamp(48px,6vw,80px) 0}
+  .dl-row{display:flex;flex-wrap:wrap;gap:24px;align-items:center;justify-content:space-between}
+  .dl h2{font-family:var(--display);font-weight:600;margin:0;
+    font-size:clamp(28px,3.4vw,46px);letter-spacing:-.038em;line-height:1.05}
+  .dl .facts{font-family:var(--mono);font-size:12px;color:var(--text3);margin-top:12px}
+
+  footer{padding:56px 0 44px;color:var(--text3);font-size:13.5px}
+  .foot{display:flex;flex-wrap:wrap;gap:20px;justify-content:space-between;align-items:center}
+  .foot nav{display:flex;gap:22px}
+  .foot a:hover{color:var(--text)}
+
+  @media (max-width:960px){
+    .hero-grid,.cap{grid-template-columns:1fr}
+    .cap.flip .cap-copy{order:0}
+    .rail{grid-template-columns:repeat(2,1fr);gap:32px}
+    .nav ul{display:none}
+  }
+  @media (max-width:560px){
+    .rail{grid-template-columns:1fr}
+    .grid-ret{grid-template-columns:repeat(3,1fr)}
+    .btn-lg{width:100%;justify-content:center}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="mark" href="#">
+      <svg width="18" height="18" viewBox="0 0 120 120" aria-hidden="true">
+        <g fill="#00E599"><rect x="57" y="14" width="6" height="30" rx="3"/>
+        <rect x="57" y="76" width="6" height="30" rx="3"/>
+        <rect x="14" y="57" width="30" height="6" rx="3"/>
+        <rect x="76" y="57" width="30" height="6" rx="3"/></g>
+      </svg>
+      crshhx
+    </a>
+    <ul>
+      <li><a href="#">Features</a></li>
+      <li><a href="#">Documentation</a></li>
+      <li><a href="#">Changelog</a></li>
+    </ul>
+    <span class="spacer"></span>
+    <span class="mono">v1.1.0</span>
+    <a class="btn btn-accent" href="#">Download</a>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <div class="eyebrow">Windows 10 &amp; 11 · 64-bit</div>
+      <h1>Your crosshair,<br>exactly where<br><em>you put it.</em></h1>
+      <p class="lead">crshhx draws a reticle above any game on Windows — and behind it
+        sits a real editor: per-arm geometry, a 258-preset library, profiles per game,
+        and keybinds that switch the crosshair with your weapon.</p>
+      <div class="cta">
+        <a class="btn btn-accent btn-lg" href="#">Download for Windows</a>
+        <a class="btn btn-quiet btn-lg" href="#">See the editor</a>
+      </div>
+      <div class="req"><b>84.7 MB</b> installer · <b>77.7 MB</b> portable · no account, no telemetry</div>
+    </div>
+
+    <div class="stage">
+      <div class="stage-read">len 4.0<br>thk 2.0<br>gap 2.0</div>
+      <svg width="240" height="240" viewBox="0 0 120 120" role="img"
+           aria-label="Crosshair preview: four arms, centre dot, outline">
+        <g fill="#000"><rect x="55.5" y="34.5" width="9" height="27" rx="4.5"/>
+          <rect x="55.5" y="58.5" width="9" height="27" rx="4.5"/>
+          <rect x="34.5" y="55.5" width="27" height="9" rx="4.5"/>
+          <rect x="58.5" y="55.5" width="27" height="9" rx="4.5"/>
+          <circle cx="60" cy="60" r="4.5"/></g>
+        <g fill="#35E0FF"><rect x="57" y="36" width="6" height="24" rx="3"/>
+          <rect x="57" y="60" width="6" height="24" rx="3"/>
+          <rect x="36" y="57" width="24" height="6" rx="3"/>
+          <rect x="60" y="57" width="24" height="6" rx="3"/>
+          <circle cx="60" cy="60" r="3"/></g>
+      </svg>
+      <div class="stage-tag">Illustrative preview, rendered from the application’s real parameters — not a screenshot.</div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap">
+  <dl class="rail" style="margin:0">
+    <div><dt>258</dt><dd>built-in presets across Valorant, CS2, Fortnite and Apex</dd></div>
+    <div><dt>5</dt><dd>weapon slots, each rebindable, switched by a passive hook</dd></div>
+    <div><dt>F10</dt><dd>toggles the overlay; F9 cycles presets without leaving the game</dd></div>
+    <div><dt>0</dt><dd>accounts, telemetry or network calls — it works offline after install</dd></div>
+  </dl>
+</div>
+
+<section class="wrap cap">
+  <div class="cap-copy">
+    <div class="idx">01 — DESIGNER</div>
+    <h2>Edit the reticle,<br>not a description of it.</h2>
+    <p>Per-arm length and thickness, gap, rotation, scale, outer and inner outlines,
+      centre dot, spread ring and glow. Colour tools report contrast against the target
+      backdrop while you pick, every change is undoable, and a held snapshot can be
+      diffed against the working copy parameter by parameter.</p>
+    <div class="chips">
+      <span class="chip">length 0–12</span><span class="chip">thickness 0–6</span>
+      <span class="chip">gap −4–12</span><span class="chip">rotation 15°</span>
+      <span class="chip">outline</span><span class="chip">centre dot</span>
+    </div>
+  </div>
+  <div class="plate">
+    <div class="plate-bar"><i></i><i></i><i></i></div>
+    <div class="grid-ret">
+      <div><svg width="46" height="46" viewBox="0 0 120 120" aria-hidden="true"><g fill="#35E0FF"><rect x="57" y="30" width="6" height="26" rx="3"/><rect x="57" y="64" width="6" height="26" rx="3"/><rect x="30" y="57" width="26" height="6" rx="3"/><rect x="64" y="57" width="26" height="6" rx="3"/></g></svg></div>
+      <div><svg width="46" height="46" viewBox="0 0 120 120" aria-hidden="true"><g fill="#2BE08A"><circle cx="60" cy="60" r="9"/></g></svg></div>
+      <div><svg width="46" height="46" viewBox="0 0 120 120" aria-hidden="true"><g fill="#F2F5F6"><rect x="58" y="34" width="4" height="22" rx="2"/><rect x="58" y="64" width="4" height="22" rx="2"/><rect x="34" y="58" width="22" height="4" rx="2"/><rect x="64" y="58" width="22" height="4" rx="2"/></g></svg></div>
+      <div><svg width="46" height="46" viewBox="0 0 120 120" aria-hidden="true"><g fill="none" stroke="#FFC24D" stroke-width="6"><circle cx="60" cy="60" r="26"/></g></svg></div>
+      <div><svg width="46" height="46" viewBox="0 0 120 120" aria-hidden="true"><g fill="#FF5EA8"><path d="M60 34 L86 86 L34 86 Z" opacity=".9"/></g></svg></div>
+      <div><svg width="46" height="46" viewBox="0 0 120 120" aria-hidden="true"><g fill="#FF5C5C"><rect x="57" y="40" width="6" height="20" rx="3"/><rect x="40" y="57" width="40" height="6" rx="3"/></g></svg></div>
+      <div><svg width="46" height="46" viewBox="0 0 120 120" aria-hidden="true"><g fill="#35E0FF"><rect x="58" y="38" width="4" height="18" rx="2"/><rect x="58" y="64" width="4" height="18" rx="2"/><rect x="38" y="58" width="18" height="4" rx="2"/><rect x="64" y="58" width="18" height="4" rx="2"/><circle cx="60" cy="60" r="3"/></g></svg></div>
+      <div><svg width="46" height="46" viewBox="0 0 120 120" aria-hidden="true"><g fill="#2BE08A"><rect x="57" y="36" width="6" height="18" rx="3"/><rect x="42" y="57" width="36" height="6" rx="3"/></g></svg></div>
+    </div>
+    <div class="caption">Eight of the 258 shipped presets, drawn by the site’s own renderer.</div>
+  </div>
+</section>
+
+<section class="wrap cap flip">
+  <div class="cap-copy">
+    <div class="idx">02 — WEAPON SLOTS</div>
+    <h2>The crosshair changes<br>when your weapon does.</h2>
+    <p>Record the key that selects each weapon and bind a reticle to it: shotgun on 1,
+      rifle on 2, SMG on 3, sniper on 4, utility on 5, all rebindable. The keyboard is
+      observed passively and nothing is consumed, so the game receives every keypress
+      exactly as it would without crshhx.</p>
+  </div>
+  <div class="plate">
+    <div class="plate-bar"><i></i><i></i><i></i></div>
+    <div style="display:grid;gap:8px">
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--field);border-radius:9px">
+        <span class="mono" style="color:var(--accent)">1</span><span style="font-size:14px">Shotgun</span>
+        <span style="flex:1"></span><svg width="22" height="22" viewBox="0 0 120 120" aria-hidden="true"><g fill="#FF5C5C"><rect x="55" y="34" width="10" height="24" rx="5"/><rect x="55" y="62" width="10" height="24" rx="5"/><rect x="34" y="55" width="24" height="10" rx="5"/><rect x="62" y="55" width="24" height="10" rx="5"/></g></svg></div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--field);border-radius:9px">
+        <span class="mono" style="color:var(--accent)">2</span><span style="font-size:14px">Rifle</span>
+        <span style="flex:1"></span><svg width="22" height="22" viewBox="0 0 120 120" aria-hidden="true"><g fill="#35E0FF"><rect x="57" y="36" width="6" height="24" rx="3"/><rect x="57" y="60" width="6" height="24" rx="3"/><rect x="36" y="57" width="24" height="6" rx="3"/><rect x="60" y="57" width="24" height="6" rx="3"/></g></svg></div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--field);border-radius:9px">
+        <span class="mono" style="color:var(--accent)">4</span><span style="font-size:14px">Sniper</span>
+        <span style="flex:1"></span><svg width="22" height="22" viewBox="0 0 120 120" aria-hidden="true"><g fill="#2BE08A"><circle cx="60" cy="60" r="8"/></g></svg></div>
+    </div>
+    <div class="caption">Passive input hook — the game keeps every keypress.</div>
+  </div>
+</section>
+
+<section class="dl">
+  <div class="wrap dl-row">
+    <div>
+      <h2>Download crshhx</h2>
+      <div class="facts">v1.1.0 · Windows 10 &amp; 11 · 64-bit · released 2026-11-08</div>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <a class="btn btn-accent btn-lg" href="#">Installer · 84.7 MB</a>
+      <a class="btn btn-quiet btn-lg" href="#">Portable · 77.7 MB</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <span>crshhx — Crshhx Crosshair Studio. Not code-signed; Windows SmartScreen may warn on first run.</span>
+    <nav><a href="#">Features</a><a href="#">Docs</a><a href="#">Changelog</a><a href="#">Repository</a></nav>
+  </div>
+</footer>
+
+</body>
+</html>
