@@ -158,13 +158,13 @@ describe('hydration', () => {
     const { container } = await hydrate('/download');
 
     // No disabled placeholders survive a published release.
-    expect(container.querySelectorAll('.dl-card button')).toHaveLength(0);
+    expect(container.querySelectorAll('.dl-panel button[disabled]')).toHaveLength(0);
     expect(container.textContent).not.toContain('No verified build has been published yet');
 
-    // Hero pair plus the two distribution cards: four direct file links,
-    // each with a download attribute so the click saves the .exe itself.
+    // One direct file link per panel, each with a download attribute so the
+    // click saves the .exe itself.
     const exeLinks = [...container.querySelectorAll<HTMLAnchorElement>('a[href$=".exe"]')];
-    expect(exeLinks.length).toBe(4);
+    expect(exeLinks.length).toBe(2);
     for (const link of exeLinks) {
       expect(link.getAttribute('href')).toContain(
         'https://github.com/sfingW/crshhX/releases/download/v1.1.0/',
@@ -172,12 +172,19 @@ describe('hydration', () => {
       expect(link.hasAttribute('download')).toBe(true);
     }
 
-    const hero = exeLinks.find((link) => link.textContent?.includes('Download for Windows'));
-    expect(hero?.getAttribute('href')).toContain('crshhx-crosshair-studio-setup-1.1.0.exe');
-    const portable = exeLinks.find((link) =>
-      link.textContent?.includes('Download portable version'),
-    );
+    const installer = exeLinks.find((link) => link.textContent?.includes('Download crshhx'));
+    expect(installer?.getAttribute('href')).toContain('crshhx-crosshair-studio-setup-1.1.0.exe');
+    const portable = exeLinks.find((link) => link.textContent?.includes('Download portable'));
     expect(portable?.getAttribute('href')).toContain('crshhx-crosshair-studio-portable-1.1.0.exe');
+
+    // The hashes sit behind closed disclosures — present, not cluttering.
+    const verify = container.querySelectorAll('details.dl-verify');
+    expect(verify.length).toBe(2);
+    for (const details of verify) {
+      expect(details.hasAttribute('open')).toBe(false);
+      expect(details.querySelector('summary')?.textContent).toBe('Verify download');
+      expect(details.textContent).toContain('Copy');
+    }
     expect(problems).toEqual([]);
   });
 });

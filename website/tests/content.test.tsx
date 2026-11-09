@@ -99,9 +99,22 @@ describe('server-rendered content', () => {
 
   it('publishes the real download facts on the download page', () => {
     const html = HTML['/download'];
-    // The requested call-to-action pair: one primary button, one small link.
-    expect(html).toContain('Download for Windows');
-    expect(html).toContain('Download portable version');
+    // The requested call-to-action pair: primary installer, secondary portable.
+    expect(html).toContain('Download crshhx');
+    expect(html).toContain('Download portable');
+    // Release strip and panel structure.
+    expect(html).toContain('Download crshhx</h1>');
+    expect(html).toContain('Your crosshair studio for Windows.');
+    expect(html).toContain('Latest stable release');
+    expect(html).toContain('Released 2026-11-08');
+    expect(html).toContain('Recommended');
+    expect(html).toContain('One-click installation.');
+    expect(html).toContain('No installation required.');
+    // Hashes live behind the disclosure, with the command that reproduces them.
+    expect(html).toContain('Verify download');
+    expect(html).toContain('certutil -hashfile');
+    // The three-step guide.
+    expect(html).toContain('Install in three steps');
     // Both point straight at the GitHub Release assets — the files themselves.
     expect(html).toContain(
       'href="https://github.com/sfingW/crshhX/releases/download/v1.1.0/crshhx-crosshair-studio-setup-1.1.0.exe"',
@@ -122,7 +135,6 @@ describe('server-rendered content', () => {
     expect(html).toContain('System requirements');
     expect(html).toContain('Windows 10 or Windows 11');
     expect(html).toContain('SHA-256');
-    expect(html).toContain('Installing');
     expect(html).toContain('Troubleshooting');
     expect(html).toContain('href="/changelog"');
     // Nothing from the pending state may survive, and no fact cell is a dash.

@@ -74,22 +74,36 @@ describe('download page with a published manifest', () => {
   });
 
   it('explains the one-click install instead of the retired wizard', () => {
-    expect(html).toContain('Installing takes one double-click');
+    expect(html).toContain('One-click installation.');
+    expect(html).toContain('Install in three steps');
     expect(html).not.toContain('guided');
     expect(html).not.toContain('choose a directory');
     expect(html).not.toContain('You pick the install directory');
   });
 
   it('leads with the requested call-to-action pair', () => {
-    // Primary button: direct installer download.
+    // Primary button in the recommended panel: direct installer download.
     expect(html).toMatch(
       /<a[^>]*class="btn btn-primary"[^>]*href="[^"]*studio-setup-1\.0\.0\.exe"[^>]*>/,
     );
-    expect(html).toContain('Download for Windows');
-    // Smaller secondary link: direct portable download.
-    expect(html).toMatch(/<a[^>]*class="dl-portable-link"[^>]*studio-portable-1\.0\.0\.exe/);
-    expect(html).toContain('Download portable version');
+    expect(html).toContain('Download crshhx');
+    expect(html).toContain('Recommended');
+    // Secondary button in the portable panel: direct portable download.
+    expect(html).toMatch(
+      /<a[^>]*class="btn btn-secondary"[^>]*href="[^"]*studio-portable-1\.0\.0\.exe"[^>]*>/,
+    );
+    expect(html).toContain('Download portable');
     // The unsigned-build warning is always part of the live state.
     expect(html).toContain('SmartScreen');
+  });
+
+  it('keeps the hashes behind a disclosure with a copy control', () => {
+    expect(html).toContain('<details class="dl-verify">');
+    expect(html).toContain('Verify download');
+    expect(html).toContain('Copy SHA-256 to clipboard');
+    expect(html).toContain('certutil -hashfile crshhx-crosshair-studio-setup-1.0.0.exe SHA256');
+    // The full hashes are in the document, but not on the panel faces.
+    expect(html).toContain('a'.repeat(64));
+    expect(html).toContain('b'.repeat(64));
   });
 });

@@ -1,27 +1,31 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Callout, SectionHead } from '../components/Blocks';
-import { Reveal } from '../components/Reveal';
 import { IconArrow, IconDownload, IconFolders } from '../components/icons';
-import type { ReleaseArtifact, ReleaseEntry, ReleaseManifest } from '../site';
+import type { ReleaseArtifact, ReleaseManifest } from '../site';
 import { isDownloadable, latestPublishedEntry, pickArtifact } from '../site';
 import data from '../releases.json';
 
 const manifest = data as unknown as ReleaseManifest;
 
 /**
- * The download system reads from `src/releases.json`. Until a verified Windows
- * build exists, `latest` is null and this page renders the Coming Soon state:
- * no link, no fabricated size, no invented date. The moment the manifest names
- * a published release with real artifacts, the page turns into direct file
- * links — clicking a button downloads the `.exe` itself, not a page about it
- * and not a zip of something else.
+ * The download page reads from `src/releases.json`. While nothing is
+ * published it renders the honest Coming Soon state — no links, no sizes, no
+ * invented dates. Once the manifest names a release with verified artifacts,
+ * the same layout serves direct file links: clicking a button downloads the
+ * `.exe` itself, not a page about it and not a zip of something else.
  */
+
+/** Size in MB, measured — never estimated. Empty until the manifest has it. */
+function sizeLabel(artifact: ReleaseArtifact | null): string {
+  return typeof artifact?.size === 'number' ? `${(artifact.size / 1048576).toFixed(1)} MB` : '';
+}
 
 /**
  * The download call to action. A published artifact renders as a real anchor
  * pointing straight at the file (with the `download` attribute, so the click
- * saves it). Anything else renders as the disabled button the page has always
- * shown — never a link to something that does not exist.
+ * saves it). Anything else renders as a disabled button — never a link to
+ * something that does not exist.
  */
 function DownloadButton({
   artifact,
@@ -49,30 +53,54 @@ function DownloadButton({
   );
 }
 
-/** Version / date / size / hash rows — dashes until real measurements exist. */
-function MetaList({
-  entry,
-  artifact,
-}: {
-  entry: ReleaseEntry | null;
-  artifact: ReleaseArtifact | null;
-}) {
-  const live = isDownloadable(artifact);
+/**
+ * Copy-to-clipboard for the hash. Markup is static (SSR-safe); the clipboard
+ * is only touched on click, and a denied or missing API simply does nothing —
+ * the hash stays selectable as text either way.
+ */
+function CopyHashButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
   return (
-    <dl className="dl-meta">
-      <dt>Version</dt>
-      <dd>{live && entry ? entry.version : '—'}</dd>
-      <dt>Released</dt>
-      <dd>{live && entry ? entry.date : '—'}</dd>
-      <dt>Size</dt>
-      <dd>
-        {live && typeof artifact?.size === 'number'
-          ? `${(artifact.size / 1048576).toFixed(1)} MB`
-          : '—'}
-      </dd>
-      <dt>SHA-256</dt>
-      <dd>{live && artifact?.sha256 ? artifact.sha256 : '—'}</dd>
-    </dl>
+    <button
+      type="button"
+      className="dl-copy"
+      aria-label="Copy SHA-256 to clipboard"
+      onClick={() => {
+        if (!navigator.clipboard?.writeText) return;
+        navigator.clipboard
+          .writeText(value)
+          .then(() => {
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1600);
+          })
+          .catch(() => undefined);
+      }}
+    >
+      {copied ? 'Copied' : 'Copy'}
+    </button>
+  );
+}
+
+/**
+ * The full SHA-256 lives behind a small disclosure instead of cluttering the
+ * panel: expanded on demand, with the exact Windows command that reproduces
+ * it. Only rendered when the manifest carries a real hash.
+ */
+function VerifyDisclosure({ artifact }: { artifact: ReleaseArtifact }) {
+  if (!artifact.sha256) return null;
+  return (
+    <details className="dl-verify">
+      <summary>Verify download</summary>
+      <div className="dl-verify-body">
+        <div className="dl-verify-row">
+          <code className="dl-verify-hash">{artifact.sha256}</code>
+          <CopyHashButton value={artifact.sha256} />
+        </div>
+        <p className="dl-verify-hint">
+          Check it on Windows: <code>{`certutil -hashfile ${artifact.file} SHA256`}</code>
+        </p>
+      </div>
+    </details>
   );
 }
 
@@ -80,123 +108,131 @@ export function DownloadPage() {
   const latestEntry = latestPublishedEntry(manifest);
   const installer = pickArtifact(latestEntry, 'setup');
   const portable = pickArtifact(latestEntry, 'portable');
-  const anythingLive = isDownloadable(installer) || isDownloadable(portable);
-  const sizeLabel = (artifact: ReleaseArtifact | null) =>
-    typeof artifact?.size === 'number'
-      ? `${(artifact.size / 1048576).toFixed(1)} MB`
-      : '';
+  const installerLive = isDownloadable(installer);
+  const portableLive = isDownloadable(portable);
+  const anythingLive = installerLive || portableLive;
 
   return (
     <>
+      {/* Introduction ---------------------------------------------------- */}
       <section className="section" style={{ paddingTop: 'clamp(56px, 7vw, 96px)' }}>
         <div className="container">
           <SectionHead
             level={1}
             eyebrow="Download"
-            title="crshhx for Windows"
-            lead="Two distributions: a one-click installer and a single portable executable. Both store your library in your roaming profile, so moving or updating the application never touches your crosshairs."
+            title="Download crshhx"
+            lead="Your crosshair studio for Windows."
           />
-          {anythingLive && installer?.url && portable?.url ? (
-            <div className="dl-hero-cta">
-              <a className="btn btn-primary" href={installer.url} download={installer.file}>
-                <IconDownload />
-                Download for Windows
-              </a>
-              <p className="dl-hero-meta">
-                <span>Version {latestEntry?.version}</span>
-                <span>{sizeLabel(installer)}</span>
-                <span>Windows 10 &amp; 11 · 64-bit</span>
-                <span>One-click install — recommended</span>
-              </p>
-              <a className="dl-portable-link" href={portable.url} download={portable.file}>
-                Download portable version
-              </a>
-              <p className="dl-smartscreen">
-                The portable build needs no installation. The application is not code-signed,
-                so Windows SmartScreen may warn on first run: choose “More info”, then “Run
-                anyway”.
-              </p>
-            </div>
+          {latestEntry ? (
+            <p className="dl-release-strip">
+              <span className="dl-release-version">{`v${latestEntry.version}`}</span>
+              <span>Windows 10 &amp; 11 · 64-bit</span>
+              <span>{`Released ${latestEntry.date}`}</span>
+              <span className="pill ok">Latest stable release</span>
+            </p>
           ) : null}
-          {anythingLive ? (
-            <Callout tone="info" title="Installing takes one double-click">
-              <p>
-                Download the installer, run it, and crshhx installs like any other app — no
-                questions, no folders to choose. Your crosshair library is stored outside the
-                install folder, so updating or uninstalling never deletes it.
-              </p>
-            </Callout>
-          ) : (
+          {!anythingLive ? (
             <Callout tone="warn" title="No verified build has been published yet">
               <p>
                 The application is complete and covered by automated tests, but the Windows
                 executables have not been produced and verified. This page therefore shows no
-                download links and no file sizes — inventing either would be worse than waiting.
-                When the release pipeline publishes its first artifacts, the buttons below turn
-                into direct file links and list the version, release date, byte size and SHA-256
-                of each file, taken from the same manifest the build prints.
+                download links and no file sizes — inventing either would be worse than
+                waiting. When the release pipeline publishes its first artifacts, the buttons
+                below turn into direct file links.
               </p>
             </Callout>
-          )}
+          ) : null}
         </div>
       </section>
 
+      {/* Download options ------------------------------------------------ */}
+      <section className="section" style={{ paddingTop: anythingLive ? 0 : undefined }}>
+        <div className="container">
+          <div className="dl-options">
+            <article className={`dl-panel${installerLive ? ' recommended' : ''}`}>
+              <div className="dl-panel-head">
+                <h2 className="dl-panel-title">Windows Installer</h2>
+                {installerLive ? (
+                  <span className="pill ok">Recommended</span>
+                ) : (
+                  <span className="pill pending">coming soon</span>
+                )}
+              </div>
+              <p className="dl-panel-desc">
+                One-click installation. It adds a Start menu shortcut, and your library is
+                kept outside the install folder.
+              </p>
+              <p className="dl-panel-facts">
+                <span>{sizeLabel(installer) || '—'}</span>
+                <span>{installerLive && latestEntry ? `Version ${latestEntry.version}` : 'Version —'}</span>
+              </p>
+              <DownloadButton artifact={installer} label="Download crshhx" primary />
+              {installerLive && installer ? <VerifyDisclosure artifact={installer} /> : null}
+            </article>
+
+            <article className="dl-panel">
+              <div className="dl-panel-head">
+                <h2 className="dl-panel-title">Portable Version</h2>
+                {portableLive ? (
+                  <span className="pill ok">available</span>
+                ) : (
+                  <span className="pill pending">coming soon</span>
+                )}
+              </div>
+              <p className="dl-panel-desc">
+                No installation required. Keep it on a drive or a USB stick; your library
+                lives in your roaming profile and follows you.
+              </p>
+              <p className="dl-panel-facts">
+                <span>{sizeLabel(portable) || '—'}</span>
+                <span>{portableLive && latestEntry ? `Version ${latestEntry.version}` : 'Version —'}</span>
+              </p>
+              <DownloadButton artifact={portable} label="Download portable" primary={false} />
+              {portableLive && portable ? <VerifyDisclosure artifact={portable} /> : null}
+            </article>
+          </div>
+
+          <p className="dl-fineprint">
+            The application is not code-signed, so Windows SmartScreen may warn on first run:
+            choose “More info”, then “Run anyway”. Updating or uninstalling never deletes your
+            crosshair library.
+          </p>
+        </div>
+      </section>
+
+      {/* Install guide ---------------------------------------------------- */}
       <section className="section">
         <div className="container">
           <h2 className="section-title" style={{ marginBottom: 32 }}>
-            Distributions
+            Install in three steps
           </h2>
-          <div className="dl-grid">
-            <Reveal as="div">
-              <article className="dl-card" style={{ height: '100%' }}>
-                <div className="dl-card-head">
-                  <h3 className="dl-card-title">Installer</h3>
-                  {isDownloadable(installer) ? (
-                    <span className="pill ok">available</span>
-                  ) : (
-                    <span className="pill pending">coming soon</span>
-                  )}
-                </div>
-                <p className="dim" style={{ fontSize: '0.9375rem' }}>
-                  A one-click setup. Download it, double-click it, and it installs with no
-                  prompts and adds a Start menu shortcut. Your data is kept outside the install
-                  folder, and uninstalling never deletes your library.
-                </p>
-                <MetaList entry={latestEntry} artifact={installer} />
-                <DownloadButton artifact={installer} label="Download installer" primary />
-                <p className="dl-note">
-                  {isDownloadable(installer)
-                    ? 'Clicking the button downloads the .exe file directly.'
-                    : 'The button activates when a verified .exe exists to point at.'}
-                </p>
-              </article>
-            </Reveal>
-
-            <Reveal as="div">
-              <article className="dl-card" style={{ height: '100%' }}>
-                <div className="dl-card-head">
-                  <h3 className="dl-card-title">Portable</h3>
-                  {isDownloadable(portable) ? (
-                    <span className="pill ok">available</span>
-                  ) : (
-                    <span className="pill pending">coming soon</span>
-                  )}
-                </div>
-                <p className="dim" style={{ fontSize: '0.9375rem' }}>
-                  One self-contained executable. Keep it on a drive or a USB stick; your
-                  library still lives in your roaming profile and follows you between folders.
-                </p>
-                <MetaList entry={latestEntry} artifact={portable} />
-                <DownloadButton artifact={portable} label="Download portable" primary={false} />
-                <p className="dl-note">
-                  Signed builds are a separate decision and are not part of the first release.
-                </p>
-              </article>
-            </Reveal>
-          </div>
+          <ol className="dl-guide">
+            <li className="dl-guide-step">
+              <span className="dl-guide-num" aria-hidden="true">1</span>
+              <div>
+                <h3>Download the installer</h3>
+                <p>Save the .exe with the button above.</p>
+              </div>
+            </li>
+            <li className="dl-guide-step">
+              <span className="dl-guide-num" aria-hidden="true">2</span>
+              <div>
+                <h3>Open the downloaded file</h3>
+                <p>Double-click it. It installs with no prompts.</p>
+              </div>
+            </li>
+            <li className="dl-guide-step">
+              <span className="dl-guide-num" aria-hidden="true">3</span>
+              <div>
+                <h3>Launch crshhx</h3>
+                <p>Open it from the Start menu and create your crosshair.</p>
+              </div>
+            </li>
+          </ol>
         </div>
       </section>
 
+      {/* System requirements ---------------------------------------------- */}
       <section className="section">
         <div className="container">
           <h2 className="section-title" style={{ marginBottom: 32 }}>
@@ -243,94 +279,55 @@ export function DownloadPage() {
         </div>
       </section>
 
+      {/* Troubleshooting --------------------------------------------------- */}
       <section className="section">
-        <div className="container" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 48 }}>
-          <div>
-            <h2 className="section-title" style={{ marginBottom: 32 }}>
-              Installing
-            </h2>
-            <div className="dl-steps">
-              <div className="dl-step">
-                <span className="dl-step-num">1</span>
-                <div>
-                  <h3>Installer</h3>
-                  <p>
-                    Double-click the downloaded setup file. It installs with no prompts and
-                    creates a Start menu shortcut, then you launch crshhx like any other app.
-                  </p>
-                </div>
+        <div className="container" style={{ maxWidth: 760 }}>
+          <h2 className="section-title" style={{ marginBottom: 32 }}>
+            If something is wrong
+          </h2>
+          <div className="dl-steps">
+            <div className="dl-step">
+              <span className="dl-step-num">?</span>
+              <div>
+                <h3>The overlay is not visible</h3>
+                <p>
+                  Press F10 to toggle it, and check the monitor selection in the studio. In
+                  games that use exclusive fullscreen, switch the game to borderless or
+                  windowed fullscreen.
+                </p>
               </div>
-              <div className="dl-step">
-                <span className="dl-step-num">2</span>
-                <div>
-                  <h3>Portable</h3>
-                  <p>
-                    Place the executable anywhere you like and run it. No registry entries, no
-                    install directory.
-                  </p>
-                </div>
+            </div>
+            <div className="dl-step">
+              <span className="dl-step-num">?</span>
+              <div>
+                <h3>Slot keys do not switch</h3>
+                <p>
+                  Look at the transport banner in the Weapon Slots page. If the passive hook
+                  could not start, crshhx names the reason and explains the fallback
+                  transport, which requires a modifier with single-digit keys.
+                </p>
               </div>
-              <div className="dl-step">
-                <span className="dl-step-num">3</span>
-                <div>
-                  <h3>First launch</h3>
-                  <p>
-                    The overlay appears centred on your primary monitor and the studio opens
-                    beside it. If an older installation exists, its saved data is carried over
-                    before any window is created.
-                  </p>
-                </div>
+            </div>
+            <div className="dl-step">
+              <span className="dl-step-num">?</span>
+              <div>
+                <h3>Everything else</h3>
+                <p>
+                  The documentation has a troubleshooting section and a list of frequently
+                  asked questions, and the repository accepts issue reports.
+                </p>
               </div>
             </div>
           </div>
-          <div>
-            <h2 className="section-title" style={{ marginBottom: 32 }}>
-              If something is wrong
-            </h2>
-            <div className="dl-steps">
-              <div className="dl-step">
-                <span className="dl-step-num">?</span>
-                <div>
-                  <h3>The overlay is not visible</h3>
-                  <p>
-                    Press F10 to toggle it, and check the monitor selection in the studio. In
-                    games that use exclusive fullscreen, switch the game to borderless or
-                    windowed fullscreen.
-                  </p>
-                </div>
-              </div>
-              <div className="dl-step">
-                <span className="dl-step-num">?</span>
-                <div>
-                  <h3>Slot keys do not switch</h3>
-                  <p>
-                    Look at the transport banner in the Weapon Slots page. If the passive hook
-                    could not start, crshhx names the reason and explains the fallback
-                    transport, which requires a modifier with single-digit keys.
-                  </p>
-                </div>
-              </div>
-              <div className="dl-step">
-                <span className="dl-step-num">?</span>
-                <div>
-                  <h3>Everything else</h3>
-                  <p>
-                    The documentation has a troubleshooting section and a list of frequently
-                    asked questions, and the repository accepts issue reports.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 24 }}>
-              <Link className="btn btn-secondary btn-sm" to="/docs#troubleshooting">
-                Troubleshooting
-                <IconArrow />
-              </Link>
-              <Link className="btn btn-secondary btn-sm" to="/changelog">
-                Release notes
-                <IconFolders />
-              </Link>
-            </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 24 }}>
+            <Link className="btn btn-secondary btn-sm" to="/docs#troubleshooting">
+              Troubleshooting
+              <IconArrow />
+            </Link>
+            <Link className="btn btn-secondary btn-sm" to="/changelog">
+              Release notes
+              <IconFolders />
+            </Link>
           </div>
         </div>
       </section>
