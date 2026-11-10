@@ -479,7 +479,9 @@ surface.borderLight #323542
 ```
 
 The website instead uses a **blue-cool** ink ramp (`#0b0e12 → #1a212a`) and a **pale mint**
-accent `#6fd9c0`, which `tokens.css` describes as "derived from the application's own mark".
+accent `#6fd9c0`, which `tokens.css` described as "derived from the application's own mark".
+(The mark itself was later redesigned — the CX monogram in `docs/design/brand-logo.md` —
+and the site now draws it from generated geometry; the token unification below stands.)
 The application's actual accent token is `#00e599` — a different hue. Both pass contrast
 (§8.1), so this was never caught by a test; it is a **brand coherence** failure, and it is a
 large part of why the site does not feel like the product.

@@ -4,7 +4,7 @@ import type { ReleaseManifest } from '../site';
 import { latestPublishedEntry } from '../site';
 import data from '../releases.json';
 import { CATALOGUE } from '../catalogue';
-import { BrandMark } from './Brand';
+import { BrandLockup } from './Brand';
 
 const manifest = data as unknown as ReleaseManifest;
 const latestEntry = latestPublishedEntry(manifest);
@@ -18,8 +18,7 @@ export function Footer() {
         <div className="footer-grid">
           <div>
             <span className="brand">
-              <BrandMark />
-              <span>{SITE.name}</span>
+              <BrandLockup height={28} labeled />
             </span>
             <p className="footer-blurb">
               A crosshair overlay and editor for Windows, built around one boundary: the game

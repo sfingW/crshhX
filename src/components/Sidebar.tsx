@@ -29,6 +29,8 @@ interface SidebarProps {
   onSelectView: (view: ActiveNavView) => void;
 }
 
+import { BrandMark } from '../brand/BrandMark';
+
 export const Sidebar: React.FC<SidebarProps> = ({ activeView, onSelectView }) => {
   return (
     <aside className="w-56 bg-surface-sidebar border-r border-surface-border flex flex-col justify-between shrink-0 select-none text-zinc-300">
@@ -37,6 +39,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onSelectView }) =>
       <div>
         <div className="titlebar-drag flex items-center justify-between px-5 py-4 border-b border-surface-border">
           <div className="flex items-center gap-2">
+            <span style={{ color: 'var(--brand-accent)' }} aria-hidden="true">
+              <BrandMark size={18} />
+            </span>
             <span className="font-extrabold text-zinc-100 text-sm font-mono tracking-tight">
               CRSHHX
             </span>
