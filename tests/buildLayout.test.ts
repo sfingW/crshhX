@@ -576,4 +576,29 @@ describe('release assets: only the tagged build is ever attached', () => {
     expect(attach).not.toMatch(/id-token:\s*write/);
     expect(attach).not.toMatch(/actions:\s*write/);
   });
+
+  it('can be dispatched against a release whose tag predates this file', () => {
+    // Publishing v1.2.0 proved the hard way that a `release` event runs this
+    // workflow as it existed at the tagged commit: the tag points at 59617ba,
+    // so the job executed the pre-fix resolver and failed in under a second,
+    // and re-running it replays that same definition. Dispatch executes from
+    // main, so it recovers such a release without moving its tag onto a
+    // different commit — which would invalidate the build it is meant to ship.
+    expect(attach).toContain('  workflow_dispatch:\n    inputs:\n      tag:');
+    expect(attach).toContain('INPUT_TAG: ${{ github.event.inputs.tag }}');
+    expect(attach.indexOf('if [ -n "$INPUT_TAG" ]')).toBeLessThan(attach.indexOf('elif [ -n "$EVENT_TAG" ]'));
+    expect(attach.indexOf('elif [ -n "$EVENT_TAG" ]')).toBeLessThan(attach.indexOf('--json tagName'));
+  });
+
+  it('says so when the named release does not exist', () => {
+    // A mistyped dispatch input must report itself, not masquerade as a
+    // missing packaging run three API calls later.
+    expect(attach).toContain("No published release exists for tag '$TAG'.");
+    expect(attach.indexOf('No published release exists')).toBeLessThan(attach.indexOf('Resolve the packaging run'));
+  });
+
+  it('records the trap in the file that fell into it', () => {
+    expect(attach).toContain('as it existed at the tagged');
+    expect(attach).toContain('It can: publishing v1.2.0 triggered this');
+  });
 });

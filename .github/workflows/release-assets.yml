@@ -3,23 +3,38 @@ name: Attach release assets
 # Attaches the packaged executables to a GitHub Release.
 #
 # Why this exists: GitHub's artifact and release-asset CDNs are unreachable
-# from the development sandbox, and its token can neither dispatch workflows
-# nor fire `release` events (events created by an integration token are
-# excluded from triggering Actions). The bytes can only travel inside
-# GitHub's own network, so this job does the transfer — assets are always
-# exactly what the windows-release packaging run produced and hashed, never
-# rebuilt, never the artifact zip, never uploaded by hand.
+# from the development sandbox. The bytes can only travel inside GitHub's own
+# network, so this job does the transfer — assets are always exactly what the
+# windows-release packaging run produced and hashed, never rebuilt, never the
+# artifact zip, never uploaded by hand.
+#
+# THE TRAP THIS FILE HAS ALREADY FALLEN INTO, publishing v1.2.0: for a
+# `release` event, GitHub executes this workflow **as it existed at the tagged
+# commit**, not as it exists on main. v1.2.0 is tagged at 59617ba, so
+# publishing it ran the resolver from 59617ba — the version merged afterwards
+# at 96e06f4 was never in play, and the job failed in under a second looking
+# only for a tag-push build. Re-running that job repeats the failure, because a
+# re-run replays the same definition. A fix to this file therefore cannot
+# rescue a release whose tag predates the fix; only the two triggers below that
+# execute from main can. (The older comment here claimed the sandbox token
+# "cannot fire release events". It can: publishing v1.2.0 triggered this
+# workflow one second later. That claim was wrong and is what made the trap
+# invisible.)
 #
 # Triggers:
 #   - release published: attaches to that release (fails loudly if it already
-#     carries assets — attach exactly once, never duplicate or overwrite);
-#   - a push to main that changes THIS file: the bootstrap path. Releases
-#     created by the integration token fire no event, so merging a change to
-#     this workflow runs the attach against the latest release. If that
-#     release already has its assets, the job exits quietly — it is a no-op,
-#     not a failure. The no-op is decided before any run is resolved or any
-#     artifact downloaded, so it remains a no-op even after the packaging
-#     artifact of an old release has expired.
+#     carries assets — attach exactly once, never duplicate or overwrite).
+#     Subject to the trap above: this runs the tagged commit's copy;
+#   - workflow_dispatch, with an optional tag: runs the CURRENT logic from
+#     main against any published release, which is how a release whose tag
+#     predates a fix gets its assets. Empty input means the latest release;
+#   - a push to main that changes THIS file: the bootstrap path. Merging a
+#     change to this workflow runs the attach against the latest release, so
+#     the fix and its first use arrive together. If that release already has
+#     its assets, the job exits quietly — it is a no-op, not a failure. The
+#     no-op is decided before any run is resolved or any artifact downloaded,
+#     so it remains a no-op even after the packaging artifact of an old
+#     release has expired.
 #
 # Which build it will accept, in order:
 #   1. the windows-release run triggered by pushing the release's own tag —
@@ -50,6 +65,12 @@ name: Attach release assets
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to attach to (empty = the latest release)'
+        required: false
+        default: ''
   push:
     branches: [main]
     paths:
@@ -74,9 +95,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EVENT_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
           set -euo pipefail
-          if [ -n "$EVENT_TAG" ]; then
+          if [ -n "$INPUT_TAG" ]; then
+            # Manual dispatch: the release named, whatever its age. This is the
+            # only way to run the CURRENT resolver against a release whose tag
+            # predates it, since a `release` event replays the tagged commit's
+            # copy of this file.
+            TAG="$INPUT_TAG"
+          elif [ -n "$EVENT_TAG" ]; then
             TAG="$EVENT_TAG"
           else
             # Bootstrap push: the latest release is the attach target.
@@ -84,6 +112,13 @@ jobs:
           fi
           if [ -z "$TAG" ]; then
             echo "No release to attach to." >&2
+            exit 1
+          fi
+          # Fail here rather than halfway through resolving a packaging run: a
+          # mistyped dispatch input should say so, not look like a missing
+          # build.
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json tagName >/dev/null; then
+            echo "No published release exists for tag '$TAG'." >&2
             exit 1
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
