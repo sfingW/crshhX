@@ -1,43 +1,100 @@
 import { SITE } from '../site';
+import {
+  CX_SHAPES,
+  CX_VIEWBOX,
+  LOCKUP,
+  WORD_GLYPHS,
+  WORD_STROKE,
+  WORD_TRACKING,
+} from '../lib/brandGeometry';
 
 /**
- * The mark is drawn from the application icon: an ink field, a pale ring and a
- * four-arm reticle with a centre dot. The site drops the field and keeps the
- * ring and reticle, so the wordmark reads at 26px in the header and at 256px as
- * an app tile.
+ * The brand, rendered from the generated geometry in `src/lib/brandGeometry.ts`
+ * — the same constants the static assets in `public/` are rasterised and
+ * exported from by `scripts/brand/logo.mjs`. One source, every surface: the nav
+ * and footer cannot drift from the favicon, the app icon or the OG card.
  *
- * The colours are the application's own accent, `--brand-accent: #00e599` from
- * `src/studio/index.css`, and its brighter hover value. The previous mark used a
- * paler mint that appears nowhere in the product.
+ * The monogram is a CX: an open hexagonal C whose bottom terminal flows into
+ * the leg of a K, the two diagonals fused at a vertex inside the aperture. All
+ * straight edges, one stroke weight, so it stays crisp at 16px. The wordmark is
+ * monoline geometric lowercase; the mint rule between them is the product's own
+ * accent and the only colour in the logo — monochrome contexts drop it.
  */
+
+const quadPath = (quad: readonly (readonly [number, number])[]) =>
+  quad.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x} ${y}`).join(' ') + ' Z';
+
+const MARK_PATHS = CX_SHAPES.map(quadPath).join(' ');
+
+function wordmarkPaths(originX: number) {
+  let x = originX;
+  const paths: { d: string; x: number }[] = [];
+  for (const glyph of WORD_GLYPHS) {
+    paths.push({ d: glyph.d, x });
+    x += glyph.advance + WORD_TRACKING;
+  }
+  return paths;
+}
+
+/** The standalone CX symbol. Inherits `currentColor`, so it works on any field. */
 export function BrandMark({ size = 26 }: { size?: number }) {
   return (
     <svg
       className="brand-mark"
       width={size}
       height={size}
-      viewBox="0 0 48 48"
+      viewBox={CX_VIEWBOX}
       role="img"
       aria-label={`${SITE.name} logo`}
     >
-      <circle cx="24" cy="24" r="21" fill="none" stroke="#4cf0bc" strokeWidth="2" opacity="0.5" />
-      <g fill="#00e599">
-        <rect x="21" y="7" width="6" height="12" rx="3" />
-        <rect x="21" y="29" width="6" height="12" rx="3" />
-        <rect x="7" y="21" width="12" height="6" rx="3" />
-        <rect x="29" y="21" width="12" height="6" rx="3" />
-        <circle cx="24" cy="24" r="3.4" />
-      </g>
+      <path d={MARK_PATHS} fill="currentColor" />
     </svg>
   );
 }
 
-export function BrandLockup() {
+/**
+ * The primary lockup: symbol, mint rule, wordmark. The wordmark is drawn, not
+ * typeset, so the logo reads identically everywhere — the site's display face
+ * still carries every heading around it.
+ */
+export function BrandLockup({
+  height = 26,
+  labeled = false,
+}: {
+  height?: number;
+  labeled?: boolean;
+}) {
+  const width = Math.round(((LOCKUP.width / 96) * height) * 100) / 100;
+  const rule = LOCKUP.rule;
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-      <BrandMark />
-      <span>{SITE.name}</span>
-      <span className="brand-suffix">for Windows</span>
-    </span>
+    <svg
+      className="brand-mark"
+      width={width}
+      height={height}
+      viewBox={LOCKUP.viewBox}
+      role="img"
+      aria-label={labeled ? SITE.name : undefined}
+      aria-hidden={labeled ? undefined : true}
+    >
+      <path d={MARK_PATHS} fill="currentColor" />
+      <path
+        d={`M${rule.x} ${rule.y1} L${rule.x} ${rule.y2}`}
+        stroke="var(--accent, #00e599)"
+        strokeWidth={rule.width}
+        fill="none"
+      />
+      {wordmarkPaths(LOCKUP.word.x).map((glyph) => (
+        <path
+          key={glyph.x}
+          d={glyph.d}
+          transform={`translate(${glyph.x} ${LOCKUP.word.y})`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={WORD_STROKE}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      ))}
+    </svg>
   );
 }

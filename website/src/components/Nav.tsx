@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { HEADER_LINKS, NAV_LINKS } from '../site';
-import { BrandMark } from './Brand';
+import { BrandLockup } from './Brand';
 import { IconClose, IconDownload, IconMenu } from './icons';
 
 export function Nav() {
@@ -18,8 +18,7 @@ export function Nav() {
           aria-label="crshhx — home"
           aria-current={pathname === '/' ? 'page' : undefined}
         >
-          <BrandMark />
-          <span>crshhx</span>
+          <BrandLockup height={24} />
           <span className="brand-suffix">for Windows</span>
         </Link>
 
