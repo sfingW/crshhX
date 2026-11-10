@@ -1566,3 +1566,17 @@ elements of the engine's SVG output, which is a check on geometry, not on appear
 live overlay on Windows hardware, real DPI and display-scaling behaviour (100 / 125 / 150 %),
 and side-by-side comparison against the references on a real screen remain the owner's step.
 No application release was built and nothing was deployed; both wait for explicit approval.
+
+> **Addendum, 2026-11-10 (v1.2.0 release preparation).** That last sentence was true when
+> §21 was written and has since been overtaken on one of its two halves. PR #11 was approved
+> and squash-merged to `main` as `f496ad1`; Cloudflare Pages deployed it, and production
+> `https://crshhx.pages.dev/pro-crosshairs` now serves the Gold Series band — established by
+> fetching the live page and its built stylesheet, not by looking at either, so the
+> no-browser limitation recorded above still stands.
+>
+> The other half is unchanged: **no application release has been built.** v1.1.0 remains the
+> only published executable, which leaves the live site describing two presets that the
+> downloadable build does not contain. `docs/release-notes/v1.2.0.md` prepares the release
+> that closes that gap, and `docs/release-notes/v1.2.0-windows-verification.md` records the
+> checks that need a real Windows machine. Both remain gated on the owner's approval: no tag
+> pushed, no release published, no Windows build triggered, no further production change.
