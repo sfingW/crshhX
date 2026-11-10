@@ -90,6 +90,23 @@ export interface CrosshairConfig {
   circleColor: string;
   circleOpacity: number;
 
+  /* ------------------------------------------------------------------ *
+   * v3 — segmented ring
+   *
+   * Optional so every config saved before v3 stays valid and renders
+   * exactly as it did: absent (or `circleSegments` of 1, or a full
+   * `circleArcSpan`) means the historical complete circle. With
+   * `circleSegments` N > 1 the ring is drawn as N arcs of `circleArcSpan`
+   * degrees each, spaced evenly (360/N apart) and turned by
+   * `circleArcOffset`. Arc ends are butt caps: the stroke stops exactly at
+   * the boundary angle. Unlike the complete circle, a segmented ring is
+   * NOT rotation-invariant — `rotation` turns the segment pattern with the
+   * rest of the reticle.
+   * ------------------------------------------------------------------ */
+  circleSegments?: number;    // 1 to 12
+  circleArcSpan?: number;     // degrees per segment, 1 to 360
+  circleArcOffset?: number;   // degrees, 0 to 360
+
   // Glow / Bloom
   glowEnabled: boolean;
   glowColor: string;

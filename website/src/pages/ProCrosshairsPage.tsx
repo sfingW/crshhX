@@ -14,14 +14,24 @@ const manifest = data as unknown as ReleaseManifest;
 const installer = pickArtifact(latestPublishedEntry(manifest), 'setup');
 
 const ENTRIES = CATALOGUE.pro.entries;
-const CATEGORIES = CATALOGUE.pro.categories;
 const TIERS = CATALOGUE.pro.tierLabels;
+
+/**
+ * The Gold Series is presented apart from the standard sheet, so everything
+ * below — tier rail, category tabs, counts, the sheet itself — is derived from
+ * the non-gold entries and keeps the numbers the sheet has always shown.
+ */
+const GOLD = ENTRIES.filter((entry) => entry.series === 'gold');
+const SHEET = ENTRIES.filter((entry) => entry.series !== 'gold');
+const CATEGORIES = CATALOGUE.pro.categories.filter((category) =>
+  SHEET.some((entry) => entry.category === category.id),
+);
 
 /** How many designs carry each tier label, counted rather than asserted. */
 const TIER_COUNTS = (['verified', 'inspired', 'original'] as const).map((tier) => ({
   tier,
   label: TIERS[tier],
-  count: ENTRIES.filter((entry) => entry.tier === tier).length,
+  count: SHEET.filter((entry) => entry.tier === tier).length,
 }));
 
 const BENCH = [
@@ -47,10 +57,13 @@ export function ProCrosshairsPage() {
   // A constant initial value keeps the prerendered HTML and the hydrated tree
   // identical, so this page cannot flash or mismatch.
   const [category, setCategory] = useState<string>('all');
+  // Which Gold Series card has its details open. Closed in the prerendered
+  // HTML, so hydration matches; the reveal is a pure CSS transition.
+  const [opened, setOpened] = useState<string | null>(null);
 
-  const shown = category === 'all' ? ENTRIES : ENTRIES.filter((entry) => entry.category === category);
+  const shown = category === 'all' ? SHEET : SHEET.filter((entry) => entry.category === category);
   const countFor = (id: string) =>
-    id === 'all' ? ENTRIES.length : ENTRIES.filter((entry) => entry.category === id).length;
+    id === 'all' ? SHEET.length : SHEET.filter((entry) => entry.category === id).length;
 
   return (
     <>
@@ -59,10 +72,10 @@ export function ProCrosshairsPage() {
           <span className="eyebrow">Collection · built into the application</span>
           <h1>Pro Crosshairs.</h1>
           <p className="section-lead" style={{ maxWidth: '62ch' }}>
-            {CATALOGUE.pro.total} curated designs across {CATEGORIES.length} categories,
-            installed with crshhx and open in the preview bench. They are ordinary presets in
-            the library: load one, edit it, save your own copy. The shipped design is never
-            modified.
+            {SHEET.length} curated designs across {CATEGORIES.length} categories, plus a{' '}
+            {GOLD.length}-design Gold Series — installed with crshhx and open in the preview
+            bench. They are ordinary presets in the library: load one, edit it, save your own
+            copy. The shipped design is never modified.
           </p>
           <div className="rail" style={{ marginTop: 'var(--space-7)' }}>
             {TIER_COUNTS.map((item) => (
@@ -95,13 +108,69 @@ export function ProCrosshairsPage() {
         </div>
       </section>
 
+      {/* The Gold Series sits between the honesty callout and the sheet: apart
+          from the standard catalogue, on its own surface, with its attribution
+          on the card rather than behind a click. */}
+      <section className="band world-field gold-band">
+        <div className="container">
+          <div className="band-head">
+            <span className="band-num gold-num">Gold Series</span>
+            <h2>Two recreations, presented apart.</h2>
+            <p className="band-lead">
+              Fan recreations measured from public reference imagery of MrSavage&rsquo;s
+              crosshairs — geometry, not published settings. Not official presets, and no
+              endorsement is implied. In the application they are ordinary presets; here they
+              keep their own surface.
+            </p>
+          </div>
+          <Reveal>
+            <div className="gold-grid">
+              {GOLD.map((entry) => {
+                const open = opened === entry.id;
+                return (
+                  <article className={`gold-card${open ? ' is-open' : ''}`} key={entry.id}>
+                    <div className="gold-stage">
+                      {/* 100 px is the same drawing as 150 px, scaled: the mirror renderer
+                          works in config units against a fixed viewBox, so a smaller `size`
+                          shrinks the geometry proportionally and keeps it centred — the
+                          designs are unchanged, only their presentation is compact. */}
+                      <Reticle spec={entry.spec} size={100} label={`${entry.name} crosshair`} />
+                    </div>
+                    <span className="gold-label">Gold exclusive</span>
+                    <h3 className="gold-name">{entry.name}</h3>
+                    <p className="gold-desc">{entry.description}</p>
+                    <button
+                      type="button"
+                      className="gold-toggle"
+                      aria-expanded={open}
+                      onClick={() => setOpened(open ? null : entry.id)}
+                    >
+                      {open ? 'Close details' : 'Open details'}
+                    </button>
+                    <div className="gold-more">
+                      <div className="gold-more-inner">
+                        <p className="gold-inspiration">{entry.inspiration}</p>
+                        <p className="gold-facts">
+                          <span>{TIERS[entry.tier]}</span>
+                          <span>{entry.topology}</span>
+                        </p>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
       <section className="band world-field">
         <div className="container">
           <div className="band-head">
             <span className="band-num">Catalogue</span>
             <h2>Filter by category.</h2>
             <p className="band-lead" role="status">
-              Showing {shown.length} of {ENTRIES.length} designs.
+              Showing {shown.length} of {SHEET.length} designs.
             </p>
           </div>
 
@@ -113,7 +182,7 @@ export function ProCrosshairsPage() {
               onClick={() => setCategory('all')}
             >
               All
-              <span className="cat-tab-count">{ENTRIES.length}</span>
+              <span className="cat-tab-count">{SHEET.length}</span>
             </button>
             {CATEGORIES.map((item) => (
               <button

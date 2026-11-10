@@ -46,19 +46,32 @@ describe('generated catalogue — pro crosshairs', () => {
 
   it('carries every design the application ships, with unique ids', () => {
     expect(pro.entries).toHaveLength(pro.total);
-    expect(pro.total).toBe(40);
+    expect(pro.total).toBe(42);
     const ids = pro.entries.map((entry) => entry.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids.every((id) => id.startsWith('pc-'))).toBe(true);
   });
 
-  it('fills every category evenly', () => {
-    expect(pro.categories).toHaveLength(8);
-    for (const category of pro.categories) {
+  it('fills every standard category evenly', () => {
+    const standard = pro.categories.filter((category) => category.id !== 'gold');
+    expect(standard).toHaveLength(8);
+    for (const category of standard) {
       const count = pro.entries.filter((entry) => entry.category === category.id).length;
       expect(count, category.id).toBe(5);
       expect(category.label.length, category.id).toBeGreaterThan(2);
       expect(category.blurb.length, category.id).toBeGreaterThan(8);
+    }
+  });
+
+  it('keeps the Gold Series apart, attributed and labelled', () => {
+    const gold = pro.entries.filter((entry) => entry.series === 'gold');
+    expect(gold).toHaveLength(2);
+    expect(pro.categories.map((category) => category.id)).toContain('gold');
+    for (const entry of gold) {
+      expect(entry.category).toBe('gold');
+      expect(entry.tier).toBe('inspired');
+      expect(entry.inspiration).toContain('Not an official preset');
+      expect(entry.inspiration).toContain('no endorsement implied');
     }
   });
 

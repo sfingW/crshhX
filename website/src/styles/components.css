@@ -761,7 +761,6 @@
     font-size: 0.8125rem;
   }
 }
-}
 
 .table tbody tr:hover td {
   background: var(--bg-sunken);

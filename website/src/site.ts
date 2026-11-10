@@ -66,9 +66,9 @@ export const ROUTES: readonly RouteMeta[] = [
   {
     path: '/pro-crosshairs',
     label: 'Pro Crosshairs',
-    title: 'Pro Crosshairs — 40 curated designs in crshhx',
+    title: 'Pro Crosshairs — 42 curated designs in crshhx',
     description:
-      'The 40 curated crosshair designs built into crshhx, across 8 categories, with an interactive preview bench. No design is attributed to a named player unless that player published it themselves.',
+      'The 42 curated crosshair designs built into crshhx, across 8 categories plus a two-design Gold Series, with an interactive preview bench. No design is attributed to a named player unless that player published it themselves.',
   },
   {
     path: '/academy',

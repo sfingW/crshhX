@@ -259,6 +259,66 @@ export const ReticleControls: React.FC<ReticleControlsProps> = ({
                       className="w-full"
                     />
                   </div>
+
+                  {/* v3 — segmented ring. One segment is the classic full circle. */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-zinc-300">
+                      <span>Segments</span>
+                      <span className="font-mono text-zinc-200">
+                        {(config.circleSegments ?? 1) === 1
+                          ? 'full circle'
+                          : `${config.circleSegments} arcs`}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="12"
+                      step="1"
+                      value={config.circleSegments ?? 1}
+                      onChange={(e) => onChange({ circleSegments: Number(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {(config.circleSegments ?? 1) > 1 && (
+                    <>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-zinc-300">
+                          <span>Arc span</span>
+                          <span className="font-mono text-zinc-200">
+                            {config.circleArcSpan ?? 360}°
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="1"
+                          max="359"
+                          step="0.5"
+                          value={config.circleArcSpan ?? 360}
+                          onChange={(e) => onChange({ circleArcSpan: Number(e.target.value) })}
+                          className="w-full"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-zinc-300">
+                          <span>Pattern rotation</span>
+                          <span className="font-mono text-zinc-200">
+                            {config.circleArcOffset ?? 0}°
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="360"
+                          step="1"
+                          value={config.circleArcOffset ?? 0}
+                          onChange={(e) => onChange({ circleArcOffset: Number(e.target.value) })}
+                          className="w-full"
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>

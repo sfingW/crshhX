@@ -44,9 +44,9 @@ describe('library', () => {
   it('shows the catalogue, the category filters and the tier legend', () => {
     renderView();
     expect(screen.getByText('Pro Crosshairs')).toBeTruthy();
-    expect(screen.getByText(/40 curated designs, researched from competitive play/)).toBeTruthy();
+    expect(screen.getByText(/42 curated designs/)).toBeTruthy();
     // Every category chip with its count.
-    expect(screen.getByRole('tab', { name: /All \(40\)/ })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: /All \(42\)/ })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /Fortnite-inspired \(5\)/ })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /Custom designs \(5\)/ })).toBeTruthy();
     // The legend states what each tier means — the honesty contract is on screen.
@@ -56,7 +56,7 @@ describe('library', () => {
 
   it('renders one card per design with name, tier, description, facts, Apply, Edit and favourite', () => {
     renderView();
-    expect(screen.getAllByText('Apply')).toHaveLength(40);
+    expect(screen.getAllByText('Apply')).toHaveLength(42);
     const card = cardOf('Storm Tracker');
     expect(within(card).getByText('Competitive-inspired')).toBeTruthy();
     expect(within(card).getByText(/bright cyan cross with a black outline/i)).toBeTruthy();

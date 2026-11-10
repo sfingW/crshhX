@@ -130,7 +130,16 @@ describe('server-rendered content', () => {
   it('publishes the real Pro Crosshairs catalogue', () => {
     const html = HTML['/pro-crosshairs'];
     expect(html).toContain('Pro Crosshairs');
-    expect((html.match(/class="sheet-item"/g) ?? []).length).toBe(CATALOGUE.pro.total);
+    const sheet = CATALOGUE.pro.entries.filter((entry) => entry.series !== 'gold');
+    const gold = CATALOGUE.pro.entries.filter((entry) => entry.series === 'gold');
+    expect((html.match(/class="sheet-item"/g) ?? []).length).toBe(sheet.length);
+    // The Gold Series is presented apart from the sheet, with its attribution.
+    expect((html.match(/class="gold-card/g) ?? []).length).toBe(gold.length);
+    for (const entry of gold) {
+      expect(html, entry.name).toContain(entry.name);
+      // The built HTML carries the attribution with its apostrophe escaped.
+      expect(html, entry.id).toContain(entry.inspiration?.replace("'", '&#x27;'));
+    }
     for (const category of CATALOGUE.pro.categories) {
       expect(html, category.label).toContain(category.label);
     }

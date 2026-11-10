@@ -139,9 +139,24 @@ for (const [file, text] of html) {
 const CATALOGUE = JSON.parse(readFileSync(join(root, 'src', 'catalogue.json'), 'utf8'));
 const proHtml = html.get('pro-crosshairs/index.html') ?? '';
 const academyHtml = html.get('academy/index.html') ?? '';
+const sheetEntries = CATALOGUE.pro.entries.filter((entry) => entry.series !== 'gold');
+const goldEntries = CATALOGUE.pro.entries.filter((entry) => entry.series === 'gold');
 check(
-  (proHtml.match(/class="sheet-item"/g) ?? []).length === CATALOGUE.pro.total,
-  `pro-crosshairs page renders ${(proHtml.match(/class="sheet-item"/g) ?? []).length} designs, catalogue has ${CATALOGUE.pro.total}`,
+  (proHtml.match(/class="sheet-item"/g) ?? []).length === sheetEntries.length,
+  `pro-crosshairs sheet renders ${(proHtml.match(/class="sheet-item"/g) ?? []).length} designs, catalogue sheet has ${sheetEntries.length}`,
+);
+// The Gold Series is presented apart from the sheet, and its attribution must
+// ship with it: every gold card carries its inspiration line in the HTML.
+check(
+  (proHtml.match(/class="gold-card/g) ?? []).length === goldEntries.length,
+  `pro-crosshairs renders ${(proHtml.match(/class="gold-card/g) ?? []).length} gold cards, catalogue has ${goldEntries.length}`,
+);
+// React escapes the apostrophe in "MrSavage's" to &#x27; in the built HTML.
+const asHtml = (text) =>
+  text.replace(/&/g, '&amp;').replace(/'/g, '&#x27;').replace(/"/g, '&quot;');
+check(
+  goldEntries.every((entry) => proHtml.includes(asHtml(entry.inspiration ?? ''))),
+  'every Gold Series card ships its attribution in the built HTML',
 );
 check(
   (academyHtml.match(/class="lesson"/g) ?? []).length === CATALOGUE.academy.total,
@@ -327,6 +342,10 @@ const CONTRAST_PAIRS = [
   ['--on-studio-3', '--studio-3'],
   ['--accent-deep', '--studio-0'],
   ['--accent-deep', '--studio-1'],
+  // the Gold Series plate
+  ['--gold', '--gold-plate'],
+  ['--gold-bright', '--gold-plate'],
+  ['--on-field-3', '--gold-plate'],
 ];
 let contrastChecked = 0;
 for (const [fgName, bgName] of CONTRAST_PAIRS) {
