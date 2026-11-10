@@ -38,7 +38,21 @@ export const TRANSFER_VERSION = 1;
 /** Above this many presets the importer insists on an explicit confirmation. */
 export const LARGE_IMPORT_THRESHOLD = 25;
 
-export const APP_VERSION = '1.0.0';
+/**
+ * Which build wrote an export file, stamped into its envelope as provenance.
+ *
+ * This is not the application's display version — Electron reads that from
+ * package.json at runtime — and it is not a compatibility gate. `parseTransferFile`
+ * turns a mismatch into the informational note "Exported by crshhx X."; refusals
+ * come from the format version, and a newer crosshair schema is reported rather
+ * than half-applied. Bumping it is therefore safe across versions: files written
+ * by older builds keep importing, they just say where they came from.
+ *
+ * It tracks the release version, and `tests/releaseVersion.test.ts` pins the two
+ * together so this cannot silently drift behind package.json again — it sat at
+ * 1.0.0 through the whole 1.1.0 release.
+ */
+export const APP_VERSION = '1.2.0';
 
 export interface ExportedPresetMeta {
   description: string;
