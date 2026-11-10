@@ -83,6 +83,22 @@ describe('route table', () => {
     expect(routeFor('/nope')).toBeUndefined();
   });
 
+  it('looks up a route when the host has added a trailing slash', () => {
+    // Cloudflare Pages redirects /download to /download/, and React Router
+    // matches that path to its route. The metadata lookup has to agree, or the
+    // page renders correctly under the 404's title.
+    for (const route of ROUTES) {
+      expect(routeFor(`${route.path}/`), route.path).toBe(routeFor(route.path));
+    }
+    expect(routeFor('/download/')?.label).toBe('Download');
+    // Home must survive normalisation: appending a slash to `/` yields `//`,
+    // which strips to an empty string and would otherwise match nothing. And
+    // an unknown path must stay unknown with or without the slash.
+    expect(routeFor('/')?.path).toBe('/');
+    expect(routeFor('//')?.path).toBe('/');
+    expect(routeFor('/nope/')).toBeUndefined();
+  });
+
   it('describes the product and its repository', () => {
     expect(SITE.name).toBe('crshhx');
     expect(SITE.productName.length).toBeGreaterThan(4);
