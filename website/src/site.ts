@@ -96,7 +96,7 @@ export const ROUTES: readonly RouteMeta[] = [
     label: 'Changelog',
     title: 'Changelog — crshhx release history',
     description:
-      'Release history for crshhx, rendered from the repository’s release manifest: v1.1.0 published for Windows with measured file sizes and SHA-256 checksums, and earlier development notes listed separately and labelled as unpublished.',
+      'Release history for crshhx, rendered from the repository’s release manifest: v1.2.0 published for Windows with measured file sizes and SHA-256 checksums, and earlier development notes listed separately and labelled as unpublished.',
   },
 ];
 

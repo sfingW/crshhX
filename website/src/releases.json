@@ -1,6 +1,6 @@
 {
   "channel": "released",
-  "latest": "1.1.0",
+  "latest": "1.2.0",
   "published": [
     {
       "version": "1.1.0",
@@ -33,6 +33,36 @@
           "url": "https://github.com/sfingW/crshhX/releases/download/v1.1.0/crshhx-crosshair-studio-portable-1.1.0.exe",
           "size": 81455085,
           "sha256": "037476deef04f4a56de5a58860dc7c61e80a9c8abab078c183d63a0e8ba842e2"
+        }
+      ]
+    },
+    {
+      "version": "1.2.0",
+      "date": "2026-11-10",
+      "status": "published",
+      "summary": "Gold Series: two fan recreations — Arc Crown and Compact Mark — plus segmented-circle controls in the Designer. Existing libraries, settings and exports load unchanged. Built and checksum-verified by CI on Windows; runtime behaviour on a physical Windows machine has not been tested yet.",
+      "added": [
+        "Gold Series in Pro Crosshairs: Arc Crown (four segmented vermilion arcs around a green centre point) and Compact Mark (a compact green cross with a hollow centre), each with its own category and its attribution shown in the app.",
+        "Segmented-circle Designer controls: segment count, arc span and pattern rotation, for any ring-based design.",
+        "Crosshair schema v3. The new fields are optional and default to a complete circle, so configurations and export files from earlier versions load unchanged."
+      ],
+      "improved": [
+        "The renderer draws genuine SVG arcs for segmented circles instead of approximating them, so the preview and the overlay agree.",
+        "Export files stamp the version that wrote them, so an import can report where a library came from."
+      ],
+      "fixed": [],
+      "artifacts": [
+        {
+          "file": "crshhx-crosshair-studio-setup-1.2.0.exe",
+          "url": "https://github.com/sfingW/crshhX/releases/download/v1.2.0/crshhx-crosshair-studio-setup-1.2.0.exe",
+          "size": 88863598,
+          "sha256": "1b97d1878d1c44283496abdc633b20ed573c9264ee5edd2175d5e2aa8632fc19"
+        },
+        {
+          "file": "crshhx-crosshair-studio-portable-1.2.0.exe",
+          "url": "https://github.com/sfingW/crshhX/releases/download/v1.2.0/crshhx-crosshair-studio-portable-1.2.0.exe",
+          "size": 81464041,
+          "sha256": "104309e1465437257e76268f9074a8968b24c8772d95cb40d5f959648e47264e"
         }
       ]
     }

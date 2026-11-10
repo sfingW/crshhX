@@ -184,15 +184,15 @@ describe('hydration', () => {
     expect(exeLinks.length).toBe(2);
     for (const link of exeLinks) {
       expect(link.getAttribute('href')).toContain(
-        'https://github.com/sfingW/crshhX/releases/download/v1.1.0/',
+        'https://github.com/sfingW/crshhX/releases/download/v1.2.0/',
       );
       expect(link.hasAttribute('download')).toBe(true);
     }
 
     const installer = exeLinks.find((link) => link.textContent?.includes('Download crshhx'));
-    expect(installer?.getAttribute('href')).toContain('crshhx-crosshair-studio-setup-1.1.0.exe');
+    expect(installer?.getAttribute('href')).toContain('crshhx-crosshair-studio-setup-1.2.0.exe');
     const portable = exeLinks.find((link) => link.textContent?.includes('Download portable'));
-    expect(portable?.getAttribute('href')).toContain('crshhx-crosshair-studio-portable-1.1.0.exe');
+    expect(portable?.getAttribute('href')).toContain('crshhx-crosshair-studio-portable-1.2.0.exe');
 
     // The hashes sit behind closed disclosures — present, not cluttering.
     const verify = container.querySelectorAll('details.dl-verify');

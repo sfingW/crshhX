@@ -89,7 +89,7 @@ describe('server-rendered content', () => {
     // The published build turns the hero CTA into the file itself — no
     // intermediate page between the visitor and the installer.
     expect(html).toContain(
-      'href="https://github.com/sfingW/crshhX/releases/download/v1.1.0/crshhx-crosshair-studio-setup-1.1.0.exe"',
+      'href="https://github.com/sfingW/crshhX/releases/download/v1.2.0/crshhx-crosshair-studio-setup-1.2.0.exe"',
     );
     expect(html).toContain('Ready for Windows.');
     // The counts on the rail come from the generated catalogue, not from copy.
@@ -181,7 +181,7 @@ describe('server-rendered content', () => {
     expect(html).toContain('Download crshhx</h1>');
     expect(html).toContain('Your crosshair studio for Windows.');
     expect(html).toContain('Latest stable release');
-    expect(html).toContain('Released 2026-11-08');
+    expect(html).toContain('Released 2026-11-10');
     expect(html).toContain('Recommended');
     expect(html).toContain('One-click installation.');
     expect(html).toContain('No installation required.');
@@ -192,18 +192,23 @@ describe('server-rendered content', () => {
     expect(html).toContain('Install in three steps');
     // Both point straight at the GitHub Release assets — the files themselves.
     expect(html).toContain(
-      'href="https://github.com/sfingW/crshhX/releases/download/v1.1.0/crshhx-crosshair-studio-setup-1.1.0.exe"',
+      'href="https://github.com/sfingW/crshhX/releases/download/v1.2.0/crshhx-crosshair-studio-setup-1.2.0.exe"',
     );
     expect(html).toContain(
-      'href="https://github.com/sfingW/crshhX/releases/download/v1.1.0/crshhx-crosshair-studio-portable-1.1.0.exe"',
+      'href="https://github.com/sfingW/crshhX/releases/download/v1.2.0/crshhx-crosshair-studio-portable-1.2.0.exe"',
     );
-    // Measured facts from the release metadata: version, sizes, hashes.
-    expect(html).toContain('1.1.0');
-    expect(html).toContain('2026-11-08');
+    // Measured facts from the release metadata: version, sizes, hashes. These
+    // two digests are the ones GitHub stores for the published assets, and the
+    // attach job's own sha256sum of the bytes it uploaded agrees with them.
+    expect(html).toContain('1.2.0');
+    expect(html).toContain('2026-11-10');
     expect(html).toContain('84.7 MB');
     expect(html).toContain('77.7 MB');
-    expect(html).toContain('bed1e654a6ce8dc0226c77fd8872da848e2d0a2f3eba6bb7dd104084dccac45d');
-    expect(html).toContain('037476deef04f4a56de5a58860dc7c61e80a9c8abab078c183d63a0e8ba842e2');
+    expect(html).toContain('1b97d1878d1c44283496abdc633b20ed573c9264ee5edd2175d5e2aa8632fc19');
+    expect(html).toContain('104309e1465437257e76268f9074a8968b24c8772d95cb40d5f959648e47264e');
+    // The runtime-testing limitation travels with the release, on the page
+    // where someone decides whether to install it — not only in the repository.
+    expect(html).toContain('has not been tested yet');
     // Security guidance for an unsigned build: what warns, why, and what to do.
     expect(html).toContain('SmartScreen');
     expect(html).toContain('Not code-signed');
@@ -256,12 +261,20 @@ describe('server-rendered content', () => {
     const html = HTML['/changelog'];
     // The published release leads, with its measured artifacts as plain chips.
     expect(html).toContain('Published releases');
-    expect(html).toContain('1.1.0');
+    expect(html).toContain('1.2.0');
     expect(html).toContain('pill ok">published');
-    expect(html).toContain('crshhx-crosshair-studio-setup-1.1.0.exe');
+    expect(html).toContain('crshhx-crosshair-studio-setup-1.2.0.exe');
     // The features that shipped in it are named, including the two new pages.
     expect(html).toContain('Pro Crosshairs library');
     expect(html).toContain('Crosshair Academy');
+    // And what the newest release added, attribution and all.
+    expect(html).toContain('Gold Series in Pro Crosshairs');
+    expect(html).toContain('Arc Crown');
+    expect(html).toContain('Compact Mark');
+    // Published history is not rewritten: 1.1.0 stays listed with its own
+    // artifacts, which are different files carrying different digests.
+    expect(html).toContain('1.1.0');
+    expect(html).toContain('crshhx-crosshair-studio-setup-1.1.0.exe');
     // Development notes stay in their own section, visibly not a release.
     expect(html).toContain('In development');
     expect(html).toContain('1.0.0');
