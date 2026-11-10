@@ -1160,10 +1160,33 @@
  * plate, one shimmer pass on hover or open, no glow, no gradients on
  * type, nothing spinning. Every motion is transform/opacity/grid-rows
  * only, and all of it stands down for reduced motion.
+ *
+ * Compactness is part of the brief too. Two premium cards should read
+ * as an inset a visitor can take in at a glance, not as feature panels
+ * that push the catalogue off the screen — so this band takes less
+ * vertical room than the rest of the page, its head is set smaller, and
+ * the cards are sized around a 100 px reticle. The reticle scales with
+ * its stage, which keeps the art-to-frame ratio the designs were drawn
+ * at: the same two crosshairs, presented smaller, geometry untouched.
  * ------------------------------------------------------------------ */
 
 .gold-band {
   border-block: 1px solid var(--gold-line);
+  padding-block: clamp(44px, 5vw, 72px);
+}
+
+.gold-band .band-head {
+  margin-bottom: clamp(18px, 2.4vw, 28px);
+}
+
+.gold-band .band-head h2 {
+  font-size: clamp(1.625rem, 2.6vw, 2.125rem);
+}
+
+.gold-band .band-lead {
+  max-width: 52ch;
+  font-size: 15px;
+  line-height: 1.5;
 }
 
 .gold-num {
@@ -1172,9 +1195,9 @@
 
 .gold-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: var(--space-5);
-  max-width: 880px;
+  grid-template-columns: repeat(auto-fit, minmax(248px, 1fr));
+  gap: var(--space-4);
+  max-width: 640px;
 }
 
 .gold-card {
@@ -1182,8 +1205,8 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-5);
+  gap: var(--space-2);
+  padding: var(--space-4);
   background: var(--gold-plate);
   border: 1px solid var(--gold-line);
   border-radius: 8px;
@@ -1228,11 +1251,13 @@
 }
 
 /* The reticle keeps the product's own sunken surface, not a gold one: the
-   honesty rule — product visuals sit on field plates. */
+   honesty rule — product visuals sit on field plates. At 16 px of padding the
+   stage is 134 px tall around a 100 px drawing — a third smaller than the
+   original 200 px frame around 150 px: same proportion, smaller footprint. */
 .gold-stage {
   display: grid;
   place-items: center;
-  padding: var(--space-5);
+  padding: var(--space-4);
   background: var(--field-2);
   border: 1px solid var(--gold-line);
   border-radius: 4px;
@@ -1240,13 +1265,13 @@
 
 .gold-label {
   width: max-content;
-  padding: 2px 8px;
+  padding: 1px 7px;
   border: 1px solid var(--gold-line);
   border-radius: 4px;
   color: var(--gold);
   font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.18em;
+  font-size: 10px;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
@@ -1254,7 +1279,7 @@
   margin: 0;
   color: var(--gold-bright);
   font-family: var(--font-display);
-  font-size: var(--title-1);
+  font-size: var(--title-2);
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -1262,8 +1287,8 @@
 .gold-desc {
   margin: 0;
   color: var(--on-field-2);
-  font-size: 15px;
-  line-height: 1.55;
+  font-size: 13.5px;
+  line-height: 1.5;
 }
 
 .gold-toggle {
@@ -1274,8 +1299,8 @@
   cursor: pointer;
   color: var(--gold);
   font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.08em;
+  font-size: 11px;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   transition: color 0.18s var(--ease);
 }
@@ -1303,20 +1328,35 @@
 
 .gold-inspiration {
   margin: 0;
-  padding-top: var(--space-3);
+  padding-top: var(--space-2);
   border-top: 1px solid var(--gold-line);
   color: var(--on-field-3);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
 .gold-facts {
   margin: 0;
   display: flex;
-  gap: var(--space-3);
+  gap: var(--space-2);
   color: var(--on-field-3);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 11px;
+}
+
+/* Below the two-column threshold the cards stack full width. They stay
+   compact rather than growing back into panels: tighter padding, and the
+   reticle keeps its 100 px drawing so the geometry is unchanged. */
+@media (max-width: 620px) {
+  .gold-grid {
+    gap: var(--space-3);
+  }
+  .gold-card {
+    padding: var(--space-3);
+  }
+  .gold-stage {
+    padding: var(--space-3);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

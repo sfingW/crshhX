@@ -130,7 +130,11 @@ export function ProCrosshairsPage() {
                 return (
                   <article className={`gold-card${open ? ' is-open' : ''}`} key={entry.id}>
                     <div className="gold-stage">
-                      <Reticle spec={entry.spec} size={150} label={`${entry.name} crosshair`} />
+                      {/* 100 px is the same drawing as 150 px, scaled: the mirror renderer
+                          works in config units against a fixed viewBox, so a smaller `size`
+                          shrinks the geometry proportionally and keeps it centred — the
+                          designs are unchanged, only their presentation is compact. */}
+                      <Reticle spec={entry.spec} size={100} label={`${entry.name} crosshair`} />
                     </div>
                     <span className="gold-label">Gold exclusive</span>
                     <h3 className="gold-name">{entry.name}</h3>

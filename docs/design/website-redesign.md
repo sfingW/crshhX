@@ -1528,6 +1528,19 @@ reticle itself always sits on the product's own sunken field surface, per the ho
 The standard sheet, its forty `.sheet-item` cards, the eight category tabs and the tier rail
 are derived from the non-gold entries and keep every number they have always shown.
 
+The band is sized as an inset, not as two feature panels. It takes `clamp(44px, 5vw, 72px)`
+of vertical padding against the page's `clamp(64px, 8vw, 120px)`, its heading is set at
+`clamp(1.625rem, 2.6vw, 2.125rem)` rather than `--display-2`, its lead at 15 px, and the
+cards live in a 640 px grid — 312 px each at desktop — around a 100 px reticle in a 134 px
+stage. Drawing and frame shrank by the same third (150 px in a 200 px stage), which is what
+keeps the art-to-frame ratio, the geometry and the visual identity identical at the smaller
+size; the mirror renderer works in config units against a fixed viewBox, so `size` scales
+everything proportionally and centred. Card padding and internal gaps dropped one step
+(24 → 16, 12 → 8), the name from `--title-1` to `--title-2`, the description 15 → 13.5 px,
+the label and toggle a point each. Two cards hold side by side down to roughly a 570 px
+viewport and stack full width below it, with padding tightened once more. Colours, hairlines,
+gold type, shimmer and the reduced-motion stand-down are untouched.
+
 ### 21.4 Verified, and how
 
 * Application suite **1199/1199** (29 files), including a new `tests/segmentedRing.test.tsx`
