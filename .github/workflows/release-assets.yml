@@ -17,11 +17,35 @@ name: Attach release assets
 #     created by the integration token fire no event, so merging a change to
 #     this workflow runs the attach against the latest release. If that
 #     release already has its assets, the job exits quietly — it is a no-op,
-#     not a failure.
+#     not a failure. The no-op is decided before any run is resolved or any
+#     artifact downloaded, so it remains a no-op even after the packaging
+#     artifact of an old release has expired.
 #
-# Either way: the packaging run for the tag must have succeeded, and the
-# artifact must contain exactly the two expected executables. Sizes and
-# SHA-256 are printed to the log before upload.
+# Which build it will accept, in order:
+#   1. the windows-release run triggered by pushing the release's own tag —
+#      the sanctioned path, whose artifact is named after the tag;
+#   2. otherwise, a `workflow_dispatch` run of windows-release on `main` whose
+#      commit is EXACTLY the commit the tag points at, whose artifact is
+#      `crshhx-windows-main`.
+#
+# Path 2 exists because the product owner works through GitHub's web interface
+# and has no local checkout: "Run workflow" on main is available there, pushing
+# a tag from a terminal is not. It is deliberately narrow. Commit equality is
+# the whole guard — a green build of any other commit is rejected, however
+# recent, because its executables could contain code the release does not
+# describe. Consequences worth knowing before publishing:
+#   - the release's tag must point at the commit that was built (draft the
+#     release against that commit, or dispatch the workflow again after main
+#     moves and re-run this job);
+#   - a pull-request build is never a candidate, and neither is a build of a
+#     different branch.
+#
+# Either way: the packaging run must have succeeded, its artifact must exist
+# and be unexpired, and it must contain exactly the two executables named for
+# this version, neither of them empty. Sizes and SHA-256 of the exact bytes
+# being uploaded are printed before the upload, so the figures quoted on the
+# website can be cross-checked against them and against the asset metadata
+# GitHub reports afterwards.
 
 on:
   release:
@@ -70,27 +94,99 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.target.outputs.tag }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
+
+          # A release that already carries its assets needs nothing from this
+          # job. Deciding that here — before a run is resolved or a byte is
+          # downloaded — is what makes the bootstrap path a genuine no-op. The
+          # alternative downloads a 170 MB artifact to discover there was
+          # nothing to do, and then fails outright once that artifact expires,
+          # which would turn every future merge touching this file red.
+          EXISTING=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --json assets --jq '.assets | length')
+          if [ "$EXISTING" != "0" ]; then
+            if [ "$EVENT_NAME" = "release" ]; then
+              echo "Release $TAG already carries $EXISTING asset(s); refusing to duplicate." >&2
+              exit 1
+            fi
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Release $TAG already carries its $EXISTING asset(s); nothing to attach."
+            exit 0
+          fi
+
+          # The commit the release points at. An annotated tag must be
+          # dereferenced first: its ref SHA identifies the tag object, not a
+          # commit, so comparing it to a run's headSha would never match — and
+          # quietly giving up and taking "any successful build" is the exact
+          # failure this step exists to prevent.
+          TAG_OBJECT=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" \
+            --jq '.object | "\(.type) \(.sha)"')
+          TAG_TYPE=${TAG_OBJECT%% *}
+          TAG_SHA=${TAG_OBJECT##* }
+          if [ "$TAG_TYPE" = "tag" ]; then
+            TAG_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$TAG_SHA" --jq '.object.sha')
+          fi
+          echo "Release $TAG points at commit $TAG_SHA"
+
+          # 1. Preferred: the build the tag push itself triggered.
           RUN_ID=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow windows-release.yml \
             --event push --branch "$TAG" --status success --limit 1 \
             --json databaseId --jq '.[0].databaseId // ""')
+          ARTIFACT="crshhx-windows-$TAG"
+          SOURCE="tag push"
+
+          # 2. Fallback: a manual run on main that built this exact commit.
+          #    Newest first, so if the same commit was dispatched more than
+          #    once the most recent successful build is the candidate.
           if [ -z "$RUN_ID" ]; then
-            echo "No successful windows-release packaging run found for $TAG." >&2
+            RUN_ID=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow windows-release.yml \
+              --event workflow_dispatch --branch main --status success --limit 10 \
+              --json databaseId,headSha --jq '.[] | "\(.databaseId) \(.headSha)"' \
+              | awk -v want="$TAG_SHA" '$2 == want { print $1; exit }')
+            ARTIFACT="crshhx-windows-main"
+            SOURCE="workflow_dispatch on main"
+          fi
+
+          if [ -z "$RUN_ID" ]; then
+            {
+              echo "No successful windows-release packaging run for $TAG."
+              echo "Expected a build of commit $TAG_SHA, from either:"
+              echo "  - a push of the tag $TAG, or"
+              echo "  - a manual run of windows-release on main at that exact commit."
+              echo "Nothing will be attached. A build of any other commit could contain"
+              echo "code this release does not describe, so it is not a candidate."
+            } >&2
             exit 1
           fi
+
+          # The artifact is named after the ref that produced it, so derive it
+          # from the resolved source and then require it to exist and be
+          # unexpired. Guessing a name, or accepting a stale one, would let a
+          # renamed or expired artifact be substituted silently.
+          FOUND=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts" \
+            --jq "[.artifacts[] | select(.name == \"$ARTIFACT\" and .expired == false)] | length")
+          if [ "$FOUND" != "1" ]; then
+            echo "Run $RUN_ID carries $FOUND unexpired artifacts named $ARTIFACT; expected exactly 1." >&2
+            exit 1
+          fi
+
+          echo "Packaging run for $TAG: $RUN_ID ($SOURCE, commit $TAG_SHA, artifact $ARTIFACT)"
           echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
-          echo "Packaging run for $TAG: $RUN_ID"
+          echo "artifact=$ARTIFACT" >> "$GITHUB_OUTPUT"
 
       - name: Download the packaged executables
+        if: steps.packaging.outputs.skip != 'true'
         uses: actions/download-artifact@v4
         with:
-          name: crshhx-windows-${{ steps.target.outputs.tag }}
+          name: ${{ steps.packaging.outputs.artifact }}
           run-id: ${{ steps.packaging.outputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: artifacts
 
       - name: Verify and attach
+        if: steps.packaging.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.target.outputs.tag }}
@@ -102,6 +198,10 @@ jobs:
           SETUP="crshhx-crosshair-studio-setup-${VERSION}.exe"
           PORTABLE="crshhx-crosshair-studio-portable-${VERSION}.exe"
 
+          # Re-checked rather than trusted: the earlier decision and this one
+          # are separated by a download, two runs can overlap, and attaching a
+          # second copy of an executable to a published release is the one
+          # mistake this job must never make.
           EXISTING=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
             --json assets --jq '.assets | length')
           if [ "$EXISTING" != "0" ]; then
@@ -113,13 +213,22 @@ jobs:
             exit 0
           fi
 
-          test -f "artifacts/$SETUP"
-          test -f "artifacts/$PORTABLE"
+          # The artifact must hold exactly the two executables for THIS version.
+          # The filenames carry the version, so a build of 1.1.0 or of an
+          # unreleased 1.3.0 cannot pass by accident — and printing what was
+          # actually found turns a silent mismatch into a diagnosable one.
           FILE_COUNT=$(find artifacts -maxdepth 1 -type f | wc -l)
-          if [ "$FILE_COUNT" -ne 2 ]; then
-            echo "Expected exactly 2 executables, found $FILE_COUNT." >&2
+          if [ "$FILE_COUNT" -ne 2 ] || [ ! -f "artifacts/$SETUP" ] || [ ! -f "artifacts/$PORTABLE" ]; then
+            echo "Expected exactly $SETUP and $PORTABLE; the artifact holds $FILE_COUNT file(s):" >&2
+            find artifacts -maxdepth 1 -type f -printf '  %f (%s bytes)\n' >&2 || ls -l artifacts >&2
+            echo "This build is for a different version, or the package is incomplete." >&2
             exit 1
           fi
+
+          # A zero-byte or truncated executable is worse than no executable: it
+          # downloads, it does not run, and its digest still looks valid.
+          test -s "artifacts/$SETUP"
+          test -s "artifacts/$PORTABLE"
 
           # Measured figures, printed so they can be quoted from this log and
           # cross-checked against the release asset metadata GitHub reports.
