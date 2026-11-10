@@ -492,3 +492,88 @@ describe('background mode + target monitor: main-process wiring', () => {
     expect(monitorDispose).toBeGreaterThan(willQuit);
   });
 });
+
+describe('release assets: only the tagged build is ever attached', () => {
+  const attach = readFileSync(join(ROOT, '.github', 'workflows', 'release-assets.yml'), 'utf8');
+
+  it('prefers the run that pushing the tag triggered', () => {
+    expect(attach).toContain('--event push --branch "$TAG" --status success');
+    expect(attach).toContain('ARTIFACT="crshhx-windows-$TAG"');
+  });
+
+  it('falls back to a manual run on main, and only at the tagged commit', () => {
+    // The product owner works through GitHub's web interface and has no local
+    // checkout, so "Run workflow" on main is a legitimate way to produce the
+    // executables — pushing a tag from a terminal is not available to them.
+    // The fallback is deliberately narrow: dispatch events, on main, whose
+    // headSha equals the commit the release points at. Commit equality is the
+    // whole guard; a green build of any other commit is not a candidate.
+    expect(attach).toContain('--event workflow_dispatch --branch main --status success');
+    expect(attach).toContain('awk -v want="$TAG_SHA" \'$2 == want { print $1; exit }\'');
+    expect(attach).toContain('ARTIFACT="crshhx-windows-main"');
+  });
+
+  it('never considers a pull-request build', () => {
+    // A PR runs the quality gate only, so it produces no executables — and a
+    // build of unmerged code must never reach a release under any circumstance.
+    expect(attach).not.toContain('--event pull_request');
+  });
+
+  it('dereferences an annotated tag before comparing commits', () => {
+    // v1.1.0 is annotated: its ref SHA names a tag object, not a commit, so
+    // comparing it to a run's headSha would never match, and a release with a
+    // perfectly good build would be reported as having none.
+    expect(attach).toContain('git/ref/tags/');
+    expect(attach).toContain('git/tags/');
+    expect(attach).toContain('if [ "$TAG_TYPE" = "tag" ]; then');
+  });
+
+  it('derives the artifact name from the resolved run, and requires it unexpired', () => {
+    expect(attach).toContain('name: ${{ steps.packaging.outputs.artifact }}');
+    expect(attach).toContain('run-id: ${{ steps.packaging.outputs.run_id }}');
+    expect(attach).toContain('.expired == false');
+  });
+
+  it('fails loudly rather than attaching something else', () => {
+    expect(attach).toContain('No successful windows-release packaging run for $TAG.');
+    expect(attach).toContain('exit 1');
+  });
+
+  it('attaches exactly once, and treats an already-attached release as a no-op', () => {
+    expect(attach).toContain('refusing to duplicate');
+    expect(attach).toContain('nothing to attach');
+  });
+
+  it('decides that no-op before resolving a run or downloading anything', () => {
+    // Otherwise the bootstrap path downloads a 170 MB artifact to discover
+    // there was nothing to do — and fails outright once that artifact has
+    // expired, turning every future merge touching this file red.
+    expect(attach).toContain('echo "skip=true" >> "$GITHUB_OUTPUT"');
+    const guard = "if: steps.packaging.outputs.skip != 'true'";
+    expect(attach.split(guard).length - 1).toBe(2);
+    expect(attach.indexOf('nothing to attach')).toBeLessThan(attach.indexOf('actions/download-artifact'));
+  });
+
+  it('requires both executables for this version, and that neither is empty', () => {
+    // The filenames carry the version, so a build of 1.1.0 or of an unreleased
+    // 1.3.0 cannot pass by accident. A zero-byte executable is worse than no
+    // executable: it downloads, it does not run, and its digest looks valid.
+    expect(attach).toContain('crshhx-crosshair-studio-setup-${VERSION}.exe');
+    expect(attach).toContain('crshhx-crosshair-studio-portable-${VERSION}.exe');
+    expect(attach).toContain('test -s "artifacts/$SETUP"');
+    expect(attach).toContain('test -s "artifacts/$PORTABLE"');
+    expect(attach).toContain('-ne 2');
+  });
+
+  it('prints the digest of the exact bytes it uploads, before uploading them', () => {
+    expect(attach).toContain('sha256sum "artifacts/$SETUP" "artifacts/$PORTABLE"');
+    expect(attach.indexOf('sha256sum')).toBeLessThan(attach.indexOf('gh release upload'));
+  });
+
+  it('asks for write access to contents and nothing more', () => {
+    expect(attach).toContain('permissions:\n  contents: write');
+    expect(attach).not.toMatch(/packages:\s*write/);
+    expect(attach).not.toMatch(/id-token:\s*write/);
+    expect(attach).not.toMatch(/actions:\s*write/);
+  });
+});
