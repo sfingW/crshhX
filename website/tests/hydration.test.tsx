@@ -116,6 +116,25 @@ describe('hydration', () => {
     }
   });
 
+  it('keeps the right title on the trailing slash the host adds', async () => {
+    // This is the production symptom, not a unit-level restatement of it:
+    // Cloudflare Pages serves /download/ for /download, the router matches it,
+    // the page renders — and the document title fell back to the 404's, so
+    // every deep link showed "Page not found — crshhx" in the browser tab.
+    problems.length = 0;
+    const { container } = await hydrate('/download/');
+    expect(problems).toEqual([]);
+    expect(container.querySelectorAll('h1')).toHaveLength(1);
+    expect(container.textContent).toContain('Download crshhx');
+    expect(document.title).toBe(routeFor('/download')?.title);
+    expect(document.title).not.toBe('Page not found — crshhx');
+    expect(document.querySelector('meta[name="description"]')?.getAttribute('content')).toBe(
+      routeFor('/download')?.description,
+    );
+    act(() => root?.unmount());
+    root = null;
+  });
+
   it('renders the 404 page for an unknown path', async () => {
     problems.length = 0;
     const { container } = await hydrate('/404');

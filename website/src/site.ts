@@ -121,7 +121,14 @@ export const MOCK_DISCLOSURE =
   'Illustrative interface preview, rendered from the application’s real parameters — not a screenshot.';
 
 export function routeFor(path: string): RouteMeta | undefined {
-  return ROUTES.find((route) => route.path === path);
+  // A static host serves clean URLs with a trailing slash: Cloudflare Pages
+  // redirects `/download` to `/download/`. React Router matches that to its
+  // route, so the page renders, while an exact lookup here missed and the tab
+  // title became the 404's — every deep link in production said "Page not
+  // found" while showing the right page. Normalising keeps the title, the meta
+  // description and the rendered route in agreement. `/` itself is left alone.
+  const normalised = path.length > 1 ? path.replace(/\/+$/, '') || '/' : path;
+  return ROUTES.find((route) => route.path === normalised);
 }
 
 /* ---------------------------------------------------------------- releases */
